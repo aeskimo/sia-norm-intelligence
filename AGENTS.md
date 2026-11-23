@@ -17,6 +17,8 @@ nachweist – und niemals mehr Sicherheit behauptet, als die Quelle hergibt.
 6. `docs/05_MILESTONES.md` – was als Nächstes zu tun ist
 7. `docs/06_TESTING.md` – wie „fertig" nachgewiesen wird
 8. `docs/adr/` – bereits getroffene Entscheidungen; nicht erneut diskutieren
+9. `docs/08_REFERENCES.md` – externe Referenzprojekte (KBOB, AEC-OSS-Directory);
+   konsultieren bei M5 (IFC) und M7 (Export)
 
 ## 3. Arbeitsschleife (immer gleich)
 1. Lies `PROGRESS.md` und bestimme den ersten offenen Milestone in `docs/05_MILESTONES.md`.
