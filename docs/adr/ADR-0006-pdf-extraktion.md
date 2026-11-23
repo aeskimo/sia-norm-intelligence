@@ -91,3 +91,65 @@
     gescannt sein sollte, bleibt der manuelle Pfad (PDF-Text wird
     in die document.json handschriftlich übernommen).
   − Neue Laufzeit-Abhängigkeit `pypdf` (mit dieser ADR gedeckt).
+
+## Addendum (2026-11-23): Pilot-Korrektur Stufe 1
+
+Status unverändert: **vorgeschlagen** – das Addendum dokumentiert die
+Pilot-Korrektur der Stufe-1-Heuristik am echten Dokument `sia101-2020`
+(48 Seiten, lokaler Mount, G4). Der Pilot hat den ursprünglichen
+Zeilen-Regex-Entwurf als unbrauchbar identifiziert: 31 erkannte „Ziffern“,
+davon 22 Laufzeilen-Footer (Seitenzahl + Dokumententitel), 25 wiederholte
+Mehreseiten-Tabellenzeilen (Zeilenköpfe `4.3.1` … `4.3.6`), 1 Tabellenwert
+`4.3.0` und Inhaltsverzeichnis-Zeilen; 2. Spalte Tabellen mit führenden
+Nullen (`4.3.01` …). Verifizierter Befund (nur Ziffern, Positionen,
+Font-Namen, Längen – G4): 73 bold-Kandidaten = 22 Footer + 25 wiederholte
+Tabellenzeilen + 1× `4.3.0` + 25 echte Überschriften; die einzige karge
+Überschrift (ganze Zeile = Ziffer) ist `2.4`; die echten Footers sitzen
+alle im unteren Seitenband (y ≈ 34 Punkte); Content-Stream-Ordnung ≠
+visuelle Lesereihenfolge (Seite 15).
+
+Entscheidung (ersetzt die Stufe-1-Heuristik):
+
+1. **Visitor-basierte Extraktion:** Zeilen entstehen aus den
+   `visitor_text`-Chunks `(text, x, y, font)`; device-Koordinaten =
+   Textmatrix × CTM; Zeilengrenzen = `\n` im Chunk-Text. Verifiziert:
+   Chunk-Konkatenation == `extract_text()`-Output auf allen 48 Seiten
+   (0 Mismatches), d. h. keine Text-Information geht verloren.
+2. **F1 – Bold-Filter:** Kandidat nur, wenn das erste Segment der Zeile
+   bold ist (BaseFont enthält „Bold“, Substitutions-`+`-Namensraum
+   beachtet) – aber nur wenn das Dokument überhaupt bold-Runs kennt;
+   einfontige Dokumente fallen zurück auf F2/F4/F5/F6 (synthetische
+   Test-PDFs bleiben damit lauffähig).
+3. **F2 – Zahlenregeln:** keine 0-Komponente (`4.3.0`) und keine
+   führenden Nullen (`0.8`, `08`) – solche Werte sind keine
+   Ziffernnummern.
+4. **F3 – Laufzeile:** einstufige Ziffer == Seitenzahl UND Zeile im
+   unteren Seitenband (y < 60 Punkte) = Footer, abgewiesen. Bewusst nur
+   das untere Band: echte Footers sitzen unten (Pilot: y ≈ 34), ein
+   beidseitiges Band finge legitime Überschriften in Kopfzeilen.
+5. **F4 – Wiederholung:** gleiche `(Ziffer, Restlänge)` auf ≥2 Seiten =
+   wiederholte Tabellenzeile, abgewiesen (Two-Pass: F4 zählt alle
+   Kandidaten, auch solche, die an anderen Filtern scheitern).
+6. **F5 – TOC-Punktgürtel** wird beibehalten (Verteidigung in der Tiefe;
+   im Pilot-Extrakt existierten die Punkte nicht, die TOC-Zeilen fielen
+   über F1 raus).
+7. **Karge Ziffern** (ganze Zeile ist die Ziffer, z. B. `2.4`) sind nur
+   mit bold + linker Marge (x ≤ 120 Punkte) Kandidaten.
+8. **Sequenz-Check in visueller Lesereihenfolge (Seite, -y, x), nicht in
+   Content-Stream-Ordnung** (Pilot-Befund Seite 15). Der Entwurf wird
+   zusätzlich nach der Ziffernnummer sortiert; die Stream-Ordnung wird
+   nur für die Text-Zuordnung (Zeilen bis zur nächsten Ziffer) genutzt.
+
+**Schema-Änderung** (`schemas/document_draft.schema.json`):
+`clauses[].text` verliert `minLength: 1` – eine karge Überschrift ohne
+Titel (Pilot: `2.4`) hat ein leeres Textfeld.
+
+Ergebnis der Re-Extraktion `sia101-2020`: exakt 26 Ziffern
+(1, 1.1–1.2, 2, 2.1–2.5, 3, 3.1–3.3, 4, 4.1–4.3, 5, 5.1–5.7, 6) – das
+Ziel-Skelett; alle 47 Fehlkandidaten abgewiesen, die karge `2.4` erkannt.
+
+Bekanntes Restrisiko (v1): ein boldes Tabellen-Element, das mit einer
+gültigen Ziffernnummer beginnt, nicht wiederholt ist und zufällig die
+Seitenzahl trägt, wäre ein Fehlkandidat – akzeptiert, weil die Stufe 2
+(manuelle Vervollständigung) jedes Skelett prüft; bei Systematik folgt
+eine weitere Regel.

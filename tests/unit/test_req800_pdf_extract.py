@@ -7,7 +7,7 @@ from pathlib import Path
 
 from sni.core.schemas import make_validator
 from sni.ingest.pdf_extract import extract_pdf
-from tests.conftest import clause_text, clauses_of, load_draft, write_norm_pdf
+from tests.conftest import PdfLine, clause_text, clauses_of, load_draft, write_norm_pdf
 
 
 def test_req800_draft_created_with_clause_skeleton(tmp_path: Path) -> None:
@@ -84,3 +84,103 @@ def test_req800_text_spans_pages(tmp_path: Path) -> None:
     assert "Testgrenzwert" in clause_text(by_number["3"])
     assert "Fortsetzung der Ziffer 3" in clause_text(by_number["3"])
     assert clause_text(by_number["4"]) == "Schluss"
+
+
+def test_req800_bold_headings_are_the_clauses(tmp_path: Path) -> None:
+    """F1 (ADR-0006): nur Ueberschriften (boldes erstes Segment) werden Ziffern;
+    regulaere TOC-/Werte-Zeilen bleiben draussen, karge Ueberschrift "2.4" kommt rein."""
+    norms = tmp_path / "norms"
+    pages: list[PdfLine] = [
+        "SYN 1  Testnorm (synthetisch)",
+        "Inhalt",
+        "1 Ziel .......... 2",
+        "2 Nachweise .......... 3",
+        ("1 Ziel", True),
+        "Diese synthetische Norm regelt Testfaelle.",
+        ("1.1 Anwendungsbereich", True),
+        "Sie gilt fuer alle Testgebaeude.",
+        ("2 Nachweise", True),
+        "Jeder Nachweis ist zu dokumentieren.",
+        "1.5 m Abstand zwischen Kanten.",
+        "2003 war eine alte Fassung.",
+        ("2.1 Groessen", True),
+        "0.8 kg pro Flaeche maximal.",
+        ("2.4", True, 56.6),
+        ("3 Grenzwerte", True),
+        ("3.1 Flaeche", True),
+        "Testgrenzwert fuer die Testflaeche.",
+    ]
+    write_norm_pdf("syn1-2020", norms, pages=pages)
+    result = extract_pdf("syn1-2020", norms_dir=norms)
+    assert result.clauses == 7
+    draft = load_draft("syn1-2020", norms)
+    numbers = [c["number"] for c in clauses_of(draft)]
+    assert numbers == ["1", "1.1", "2", "2.1", "2.4", "3", "3.1"]
+    by_number = {c["number"]: c for c in clauses_of(draft)}
+    assert clause_text(by_number["2.4"]) == ""
+    assert "Ziel" in clause_text(by_number["1"])
+
+
+def test_req800_running_footer_rejected(tmp_path: Path) -> None:
+    """F3: einstufige Ziffer == Seitenzahl im unteren Seitenband ist Laufzeile."""
+    norms = tmp_path / "norms"
+    pages: list[list[PdfLine]] = [
+        [("1 Ziel", True), "Inhaltstext."],
+        [
+            "Fortsetzungstext.",
+            "Fuellenzeile.",
+            "Fuellenzeile.",
+            "Fuellenzeile.",
+            "Fuellenzeile.",
+            ("2 Laufzeile", True),
+        ],
+    ]
+    write_norm_pdf("syn1-2020", norms, pages=pages, line_height=160.0)
+    extract_pdf("syn1-2020", norms_dir=norms)
+    draft = load_draft("syn1-2020", norms)
+    numbers = [c["number"] for c in clauses_of(draft)]
+    assert numbers == ["1"]
+    by_number = {c["number"]: c for c in clauses_of(draft)}
+    assert "Fortsetzungstext." in clause_text(by_number["1"])
+
+
+def test_req800_repeated_bold_row_rejected(tmp_path: Path) -> None:
+    """F4: gleiche (Ziffer, Restlaenge) auf 2+ Seiten ist Tabellenkopf, keine Ziffer."""
+    norms = tmp_path / "norms"
+    pages: list[list[PdfLine]] = [
+        [("1 Ziel", True), "Inhaltstext.", ("4.3.1 Wiederholung", True)],
+        [("4.3.1 Wiederholung", True), "Weitere Inhalte."],
+    ]
+    write_norm_pdf("syn1-2020", norms, pages=pages)
+    extract_pdf("syn1-2020", norms_dir=norms)
+    numbers = [c["number"] for c in clauses_of(load_draft("syn1-2020", norms))]
+    assert numbers == ["1"]
+
+
+def test_req800_zero_component_rejected(tmp_path: Path) -> None:
+    """F2: 0-Komponenten ("4.3.0", "0.8") sind Werte, keine Ziffernnummern."""
+    norms = tmp_path / "norms"
+    pages: list[PdfLine] = [
+        ("1 Ziel", True),
+        "Inhaltstext.",
+        ("4.3.0 Tabellenwert", True),
+        ("0.8 Sonderwert", True),
+    ]
+    write_norm_pdf("syn1-2020", norms, pages=pages)
+    extract_pdf("syn1-2020", norms_dir=norms)
+    numbers = [c["number"] for c in clauses_of(load_draft("syn1-2020", norms))]
+    assert numbers == ["1"]
+
+
+def test_req800_bare_number_right_of_margin_rejected(tmp_path: Path) -> None:
+    """Kare bold-Ziffer rechts ausserhalb des linken Randbereichs (Tabelle) wird abgewiesen."""
+    norms = tmp_path / "norms"
+    pages: list[PdfLine] = [
+        ("1 Ziel", True),
+        "Inhaltstext.",
+        ("22", True, 250.0),
+    ]
+    write_norm_pdf("syn1-2020", norms, pages=pages)
+    extract_pdf("syn1-2020", norms_dir=norms)
+    numbers = [c["number"] for c in clauses_of(load_draft("syn1-2020", norms))]
+    assert numbers == ["1"]

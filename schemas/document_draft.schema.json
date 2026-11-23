@@ -20,7 +20,7 @@
         "additionalProperties": false,
         "properties": {
           "number": {"type": "string", "pattern": "^[1-9][0-9]?(\\.[0-9]{1,2}){0,3}$", "description": "Ziffernnummer am Zeilenanfang erkannt (z. B. 3, 3.1, 4.2.1)."},
-          "text": {"type": "string", "minLength": 1, "description": "Extrahierter Ziffern-Text (lokal, nur fuer die Vervollstaendigung; kein Teil des document.json-Vertrags)."},
+          "text": {"type": "string", "description": "Extrahierter Ziffern-Text (lokal, nur fuer die Vervollstaendigung; kein Teil des document.json-Vertrags). Leer, wenn die Ueberschrift keinen Titel hat (ADR-0006, Pilot-Korrektur)."},
           "statement_type": {"type": "string", "description": "In der Maschinen-Erstellung leer; Werte wie in norm_statement.schema.json, in Stufe 2 zu belegen."},
           "obligation": {"type": "string", "description": "In der Maschinen-Erstellung leer; Werte wie in norm_statement.schema.json, in Stufe 2 zu belegen."},
           "summary": {"type": "string", "description": "In der Maschinen-Erstellung leer; in Stufe 2 als eigene Zusammenfassung zu belegen (kein Normzitat)."},

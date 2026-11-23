@@ -156,57 +156,94 @@ def _pdf_escape(text: str) -> str:
     return text.replace("\\", r"\\").replace("(", r"\(").replace(")", r"\)")
 
 
-def make_pdf(pages: Sequence[str] | Sequence[Sequence[str]]) -> bytes:
-    """Baut ein minimales PDF (Helvetica, Base-14, kein Embedding) aus Textzeilen.
+# Zeilen-Spezifikation für make_pdf: str (regulär), (text, bold) oder
+# (text, bold, x) mit absolutem device-x.
+PdfLine = str | tuple[str, bool] | tuple[str, bool, float]
+
+
+def _resolve_line(line: PdfLine, x: float) -> tuple[str, bool, float]:
+    """(Text, Bold, device-x) aus einer Zeilenspezifikation (Standard-x für str)."""
+    if isinstance(line, str):
+        return line, False, x
+    if len(line) == 3:
+        return line
+    return line + (x,)
+
+
+def make_pdf(
+    pages: Sequence[PdfLine] | Sequence[Sequence[PdfLine]],
+    line_height: float = 14.0,
+    start_x: float = 72.0,
+    start_y: float = 800.0,
+) -> bytes:
+    """Baut ein minimales PDF (Helvetica + Helvetica-Bold, Base-14) aus Zeilen.
 
     Argument ist eine Zeilenliste (eine Seite) oder eine Liste von
-    Zeilenlisten (mehrere Seiten). Nur synthetische Testdaten (G4).
-    pypdf liest den Text der Base-14-Schrift aus dem Content-Stream.
+    Zeilenlisten (mehrere Seiten). Eine Zeile ist ``str`` (regulär),
+    ``(text, bold)`` oder ``(text, bold, x)`` (absolutes device-x).
+    ``line_height``, ``start_x``, ``start_y`` steuern die Position in
+    device-Punkten (Ursprung unten links). Nur synthetische Testdaten (G4).
+    pypdf liest den Text der Base-14-Schriften (/F1 regulär, /F2 bold)
+    aus dem Content-Stream.
     """
-    if pages and isinstance(pages[0], str):
-        single = cast(Sequence[str], pages)
-        page_lists = [list(single)]
-    else:
-        page_lists = [list(page) for page in pages]
-    if not page_lists:
+    if not pages:
         raise ValueError("make_pdf braucht mindestens eine Seite")
+    first = pages[0]
+    if isinstance(first, (str, tuple)):
+        single = cast("Sequence[PdfLine]", pages)
+        page_lists: list[list[PdfLine]] = [list(single)]
+    else:
+        many = cast("Sequence[Sequence[PdfLine]]", pages)
+        page_lists = [list(page) for page in many]
     n = len(page_lists)
 
     content_streams: list[bytes] = []
     for page_lines in page_lists:
-        ops = ["BT /F1 11 Tf 14 TL 72 800 Td"]
-        for index, line in enumerate(page_lines):
-            if index:
-                ops.append("T*")
-            ops.append(f"({_pdf_escape(line)}) Tj")
+        ops = ["BT /F1 11 Tf"]
+        font = "F1"
+        prev: tuple[float, float] | None = None
+        for index, raw_line in enumerate(page_lines):
+            text, bold, lx = _resolve_line(raw_line, start_x)
+            ly = start_y - index * line_height
+            if prev is None:
+                ops.append(f"{lx:.2f} {ly:.2f} Td")
+            else:
+                ops.append(f"{lx - prev[0]:.2f} {ly - prev[1]:.2f} Td")
+            prev = (lx, ly)
+            want = "F2" if bold else "F1"
+            if want != font:
+                ops.append(f"/{want} 11 Tf")
+                font = want
+            ops.append(f"({_pdf_escape(text)}) Tj")
         ops.append("ET")
         content_streams.append("\n".join(ops).encode("cp1252", "replace"))
 
     objects: list[tuple[int, bytes]] = []
-    kids = " ".join(f"{4 + i} 0 R" for i in range(n))
+    kids = " ".join(f"{5 + i} 0 R" for i in range(n))
     objects.append((1, b"<< /Type /Catalog /Pages 2 0 R >>"))
     objects.append((2, f"<< /Type /Pages /Kids [{kids}] /Count {n} >>".encode("ascii")))
     objects.append((3, b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"))
+    objects.append((4, b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>"))
     for i in range(n):
         objects.append(
             (
-                4 + i,
+                5 + i,
                 b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
-                b"/Resources << /Font << /F1 3 0 R >> >> /Contents "
-                + str(4 + n + i).encode("ascii")
+                b"/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents "
+                + str(5 + n + i).encode("ascii")
                 + b" 0 R >>",
             )
         )
     for i, stream in enumerate(content_streams):
         header = b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n"
-        objects.append((4 + n + i, header + stream + b"\nendstream"))
+        objects.append((5 + n + i, header + stream + b"\nendstream"))
 
     body = bytearray(b"%PDF-1.4\n")
     offsets: dict[int, int] = {}
     for num, payload in objects:
         offsets[num] = len(body)
         body += f"{num} 0 obj\n".encode("ascii") + payload + b"\nendobj\n"
-    total = 3 + 2 * n
+    total = 4 + 2 * n
     xref_pos = len(body)
     xref = [f"xref\n0 {total + 1}\n", "0000000000 65535 f \n"]
     for num in range(1, total + 1):
@@ -219,7 +256,10 @@ def make_pdf(pages: Sequence[str] | Sequence[Sequence[str]]) -> bytes:
 def write_norm_pdf(
     norm_id: str,
     norms_dir: Path,
-    pages: Sequence[str] | Sequence[Sequence[str]] | None = None,
+    pages: Sequence[PdfLine] | Sequence[Sequence[PdfLine]] | None = None,
+    line_height: float = 14.0,
+    start_x: float = 72.0,
+    start_y: float = 800.0,
 ) -> Path:
     """Schreibt ``document.pdf`` in den lokalen Mount (Test-Helfer, M8)."""
     norm_dir = norms_dir / norm_id
@@ -227,7 +267,7 @@ def write_norm_pdf(
     if pages is None:
         pages = synthetic_pdf_lines()
     path = norm_dir / "document.pdf"
-    path.write_bytes(make_pdf(pages))
+    path.write_bytes(make_pdf(pages, line_height=line_height, start_x=start_x, start_y=start_y))
     return path
 
 
