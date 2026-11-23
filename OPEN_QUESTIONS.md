@@ -68,3 +68,46 @@ Format pro Eintrag:
 - Blockiert: – (M2 läuft mit synthetischem Platzhalter-Format weiter)
 - Status: offen
 - Antwort:
+
+## OQ-004: Vertrag für die Antwort von POST /v1/check (M5)
+- Kontext: 05_MILESTONES.md M5 (REQ-501), 04_DATA_MODEL.md (Kernobjekte-Tabelle),
+  schemas/ (6 Schemas, keins für Prüfergebnisse), AGENTS.md §6 (DoD: jedes neue
+  Datenobjekt wird gegen sein JSON-Schema validiert) + §8 (Schemas nur mit ADR)
+- Frage: Welches JSON-Vertrag liefert `POST /v1/check`, und wird dafür ein neues
+  Schema in `schemas/` ergänzt (braucht ADR-0004)?
+- Optionen: A) Neues Schema `check_result.schema.json`: Top-Level
+  `{"checks": [{"rule", "status": pass|fail|insufficient_data, "reason",
+  "value"?, "missing_inputs"?}], "gaps": [GapReport], "disclaimer"}` –
+  das Check-Resultat als eigenständiges Objekt (für REQ-702 BCF-Export
+  wird ein stabiles Vertrag-Format ohnehin nötig)
+  B) Laufzeit-Objekt ohne Schema – verstösst gegen die Definition of Done
+- Empfehlung Agent: A – DoD verlangt ein Schema, und REQ-702 (Prüfergebnisse
+  `fail` als BCF-Topic exportierbar) setzt ein stabiles, versionierbares
+  Format voraus.
+- Blockiert: REQ-501 (sowie die Integration der REQ-502-Gaps in die Antwort)
+- Status: offen
+- Antwort:
+
+## OQ-005: Semantik von pass/fail bei der Projektdaten-Prüfung (M5)
+- Kontext: 05_MILESTONES.md M5 (REQ-501), M7 (REQ-702: `fail` als BCF-Topic),
+  schemas/rule.schema.json (kein Vergleichs-/Grenzwertfeld), PROGRESS.md M3
+  ("Ausdrucks-Sprache hat (noch) keine Bedingungen/Grenzwert-Vergleiche –
+  Erweiterungspunkt für M4+")
+- Frage: Wogegen kann eine Regel `pass` oder `fail` sein? Regeln berechnen in
+  v1 nur Werte (z. B. `Gesamtfläche = Teilsfläche A + Teilsfläche B`); ein
+  Grenz- oder Vergleichswert ist im Regelmodell nicht vorgesehen.
+- Optionen: A) Konsistenzprüfung (M5, ohne Schema-Änderung): Das Projekt
+  liefert die Inputs UND einen Wert für das Output-Konzept; die Regel
+  berechnet; gleich → `pass`, unterschiedlich → `fail`, fehlende Inputs oder
+  fehlender Output-Wert → `insufficient_data`
+  B) `rule.schema.json` um ein Constraint-Feld erweitern (z. B.
+  `{"check": {"expression": "gesamtflaeche <= 5000"}}`; ADR + Schema-Änderung)
+  – Prüfung gegen echte Grenzwerte; M5 mit A, B als Follow-up
+  C) `pass` = Regel lässt sich fehlerfrei auswerten (Engine-Status `ok`),
+  `fail` = Engine-Fehler – schwächste Lesart, keine fachliche Prüfung
+- Empfehlung Agent: A für M5 (arbeitet mit bestehenden Verträgen; die
+  Engine liefert bereits alle nötigen Status), B als Follow-up-ADR, sobald
+  Grenzwert-Regeln fachlich konkret werden (z. B. "GF ≤ 5000 m2").
+- Blockiert: REQ-501
+- Status: offen
+- Antwort:
