@@ -8,18 +8,11 @@ Alle Fehler werden gesammelt und als Bericht geliefert (KBOB-Muster, 08_REFERENC
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 
-from jsonschema import Draft202012Validator
+from sni.core.schemas import make_validator
 
-from sni.core.schemas import SCHEMAS_DIR
-
-CONCEPT_SCHEMA: dict[str, object] = json.loads(
-    (SCHEMAS_DIR / "concept.schema.json").read_text(encoding="utf-8")
-)
-Draft202012Validator.check_schema(CONCEPT_SCHEMA)
-_CONCEPT_VALIDATOR = Draft202012Validator(CONCEPT_SCHEMA)
+_CONCEPT_VALIDATOR = make_validator("concept.schema.json")
 
 
 class SnapshotValidationError(ValueError):
