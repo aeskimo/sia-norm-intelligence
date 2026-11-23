@@ -16,5 +16,8 @@ reports/eval_*.json
 # Lokale Datenbanken (regenerierbar durch Import)
 data/catalog/*.db
 
+# Review Queue (regenerierbar durch make ingest)
+data/review_queue/*.json
+
 # Lizenzierte Normtexte – nie ins Repo (Guardrail G4)
 data/norms/
