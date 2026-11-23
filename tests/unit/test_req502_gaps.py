@@ -2,7 +2,6 @@
 
 from sni.core.schemas import make_validator
 from sni.projectdata.gaps import missing_project_data_gaps
-from sni.projectdata.models import ProjectValue, Provenance
 
 
 def _rule(rule_id: str, concepts: list[str], required: bool = True) -> dict[str, object]:
@@ -18,20 +17,11 @@ def _rule(rule_id: str, concepts: list[str], required: bool = True) -> dict[str,
     }
 
 
-def _value(concept: str) -> ProjectValue:
-    return ProjectValue(
-        concept=concept,
-        value=1.0,
-        unit="m2",
-        provenance=Provenance(file="flaechen.csv", locator="Zeile 2"),
-    )
-
-
 def test_req502_missing_project_data_creates_gap_report() -> None:
     rules = [_rule("sia:rule/syn1-2020/gf-summe", ["sia:concept/teilsflaeche-a", "sia:concept/b"])]
-    values = [_value("sia:concept/teilsflaeche-a")]
+    available = ["sia:concept/teilsflaeche-a"]
 
-    gaps = missing_project_data_gaps(rules, values)
+    gaps = missing_project_data_gaps(rules, available)
 
     assert len(gaps) == 1
     gap = gaps[0]
@@ -47,9 +37,9 @@ def test_req502_missing_project_data_creates_gap_report() -> None:
 
 def test_req502_all_data_present_no_gaps() -> None:
     rules = [_rule("sia:rule/syn1-2020/gf-summe", ["sia:concept/a", "sia:concept/b"])]
-    values = [_value("sia:concept/a"), _value("sia:concept/b")]
+    available = ["sia:concept/a", "sia:concept/b"]
 
-    assert missing_project_data_gaps(rules, values) == []
+    assert missing_project_data_gaps(rules, available) == []
 
 
 def test_req502_multiple_rules_same_missing_concept_one_gap() -> None:
@@ -57,9 +47,9 @@ def test_req502_multiple_rules_same_missing_concept_one_gap() -> None:
         _rule("sia:rule/syn1-2020/regel-1", ["sia:concept/a", "sia:concept/fehlt"]),
         _rule("sia:rule/syn1-2020/regel-2", ["sia:concept/fehlt"]),
     ]
-    values = [_value("sia:concept/a")]
+    available = ["sia:concept/a"]
 
-    gaps = missing_project_data_gaps(rules, values)
+    gaps = missing_project_data_gaps(rules, available)
 
     assert len(gaps) == 1
     assert gaps[0]["evidence"] == ["sia:rule/syn1-2020/regel-1", "sia:rule/syn1-2020/regel-2"]
@@ -78,7 +68,7 @@ def test_req502_optional_inputs_do_not_create_gaps() -> None:
         _rule("sia:rule/syn1-2020/regel-1", ["sia:concept/a", "sia:concept/b"], required=False)
     ]
 
-    assert missing_project_data_gaps(rules, [_value("sia:concept/a")]) == []
+    assert missing_project_data_gaps(rules, ["sia:concept/a"]) == []
 
 
 def test_req502_multiple_missing_concepts_deterministic_order() -> None:

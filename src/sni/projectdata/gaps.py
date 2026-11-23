@@ -16,24 +16,23 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Mapping, Sequence
 
-from sni.projectdata.models import ProjectValue
-
 _GAP_ID_RE = re.compile(r"^GAP-(\d{4})$")
 
 
 def missing_project_data_gaps(
     rules: Sequence[Mapping[str, object]],
-    values: Sequence[ProjectValue],
+    available_concepts: Iterable[str],
     existing_gap_ids: Iterable[str] = (),
 ) -> list[dict[str, object]]:
     """Erzeugt pro fehlendem Pflicht-Concept einen GapReport (REQ-502).
 
     ``rules``: Regel-Objekte (wie von ``sni.rules.engine.load_rules``
-    geladen, validiert gegen ``rule.schema.json``). ``values``:
-    normalisierte Projektdaten (Adapter-Output, REQ-500). Ein Concept
-    gilt als geliefert, wenn mindestens ein ``ProjectValue`` es trägt.
+    geladen, validiert gegen ``rule.schema.json``). ``available_concepts``:
+    Concept-IDs, für die Projektdaten geliefert wurden (Adapter-Output,
+    REQ-500, bzw. API-Request). Die Herkunft (Provenance) der Werte gehört
+    zur Werteseite und fliesst in die GapReports nicht ein.
     """
-    available = {value.concept for value in values}
+    available = set(available_concepts)
     needed: dict[str, set[str]] = {}
     for rule in rules:
         rule_id = rule.get("id")
