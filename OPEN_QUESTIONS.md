@@ -84,9 +84,16 @@ Format pro Eintrag:
 - Empfehlung Agent: A – DoD verlangt ein Schema, und REQ-702 (Prüfergebnisse
   `fail` als BCF-Topic exportierbar) setzt ein stabiles, versionierbares
   Format voraus.
-- Blockiert: REQ-501 (sowie die Integration der REQ-502-Gaps in die Antwort)
-- Status: offen
-- Antwort:
+- Blockiert: – (beantwortet; REQ-501 umgesetzt in M5)
+- Status: beantwortet (Empfehlung A übernommen, 2026-11-23)
+- Antwort: ADR-0004 (2026-11-23): neues Schema `schemas/check_result.schema.json`
+  (`$id: sni:check_result`, Draft 2020-12). `POST /v1/check` liefert
+  `{"checks": [...], "gaps": [...], "disclaimer": ...}`; pro Regel `rule_id`,
+  `status` (pass|fail|insufficient_data), `reason` (Begründung, REQ-501),
+  `value`/`claimed`/`unit`, `missing_inputs`, `derived_from` (Fundstelle der
+  Regel). `gaps` = GapReports `missing_project_data` (REQ-502). Nur approved
+  Regeln werden geprüft (G3). Stateless API: GAP-IDs pro Antwort fortlaufend
+  vergeben; Persistenz mit stabilen IDs = M7 (REQ-702, BCF-Export).
 
 ## OQ-005: Semantik von pass/fail bei der Projektdaten-Prüfung (M5)
 - Kontext: 05_MILESTONES.md M5 (REQ-501), M7 (REQ-702: `fail` als BCF-Topic),
@@ -108,6 +115,15 @@ Format pro Eintrag:
 - Empfehlung Agent: A für M5 (arbeitet mit bestehenden Verträgen; die
   Engine liefert bereits alle nötigen Status), B als Follow-up-ADR, sobald
   Grenzwert-Regeln fachlich konkret werden (z. B. "GF ≤ 5000 m2").
-- Blockiert: REQ-501
-- Status: offen
-- Antwort:
+- Blockiert: – (beantwortet; REQ-501 umgesetzt in M5)
+- Status: beantwortet (Empfehlung A übernommen, 2026-11-23)
+- Antwort: ADR-0004 (2026-11-23): Konsistenzprüfung für M5. Das Projekt
+  liefert die Pflicht-Inputs der Regel und einen Wert für das
+  Output-Konzept; die M3-Engine leitet den Wert ab. Gleich
+  (math.isclose, rel_tol 1e-6, abs_tol 1e-9) → pass, unterschiedlich →
+  fail, fehlende Werte (Pflicht-Input oder Output-Wert) →
+  insufficient_data; Engine-Fehler (Einheitenkonflikt, Ausdrucksdefekt) →
+  fail mit Engine-Bericht als Begründung. `pass` bedeutet Konsistenz der
+  Projektdaten mit der Regel, keine Normkonformität; Constraint-/
+  Grenzwertfelder in rule.schema.json (Option B) = Follow-up-ADR, sobald
+  fachlich konkret (z. B. "GF ≤ 5000 m2").

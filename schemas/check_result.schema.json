@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sni:check_result",
+  "type": "object",
+  "required": ["checks", "gaps", "disclaimer"],
+  "properties": {
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["rule_id", "status", "reason", "value", "claimed", "unit", "missing_inputs", "derived_from"],
+        "properties": {
+          "rule_id": {"type": "string"},
+          "status": {"enum": ["pass", "fail", "insufficient_data"]},
+          "reason": {"type": "string", "description": "Begründung des Status (REQ-501)"},
+          "value": {"type": ["number", "null"], "description": "Von der Regel abgeleiteter Wert (null wenn nicht berechenbar)"},
+          "claimed": {"type": ["number", "null"], "description": "Vom Projekt gelieferter Wert für das Output-Konzept (null wenn nicht geliefert)"},
+          "unit": {"type": ["string", "null"], "description": "Einheit des abgeleiteten Werts"},
+          "missing_inputs": {"type": "array", "items": {"type": "string"}, "description": "Fehlende Concept-IDs (nur bei insufficient_data)"},
+          "derived_from": {"type": "array", "items": {"type": "string"}, "description": "NormStatement-IDs (Fundstelle der Regel)"}
+        }
+      }
+    },
+    "gaps": {"type": "array", "items": {"$ref": "gap_report.schema.json"}},
+    "disclaimer": {"type": "string"}
+  }
+}

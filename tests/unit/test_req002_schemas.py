@@ -9,6 +9,7 @@ DRAFT_2020_12 = "https://json-schema.org/draft/2020-12/schema"
 
 EXPECTED = {
     "answer.schema.json",
+    "check_result.schema.json",
     "concept.schema.json",
     "gap_report.schema.json",
     "norm_statement.schema.json",
