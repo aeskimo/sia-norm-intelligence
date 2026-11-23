@@ -1,6 +1,8 @@
-"""FastAPI-Endpunkte (M1: GET /v1/concepts/{id}; M4: POST /v1/answer; M5: POST /v1/check).
+"""FastAPI-Endpunkte (M1: GET /v1/concepts/{id}; M4: POST /v1/answer;
+M5: POST /v1/check; M7: /v1/export/*).
 
-Fachlogik bleibt in sni.catalog (Katalog) bzw. sni.service (Antwort-Pipeline).
+Fachlogik bleibt in sni.catalog (Katalog), sni.service (Antwort-Pipeline)
+bzw. sni.export (Serialisierung, ADR-0005).
 Hinweis G6: Jede fachliche API-Antwort trägt das Feld ``disclaimer``.
 ``/healthz`` ist ein reiner Liveness-Check ohne fachlichen Inhalt.
 """
@@ -11,10 +13,11 @@ import atexit
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from sni.catalog.store import ConceptStore
+from sni.export.skos import CatalogExportError, catalog_json, catalog_ttl
 from sni.knowledge.store import DEFAULT_KNOWLEDGE_DIR, KnowledgeBase, load_knowledge
 from sni.rules.engine import DEFAULT_RULES_DIR, RuleLoadError, load_rules
 from sni.service.answerer import AnswerError, AnswerInputError, AnswerRequest, answer
@@ -131,6 +134,41 @@ def create_app(
                 status_code=500, content={"error": str(exc), "disclaimer": DISCLAIMER}
             )
         return JSONResponse(content=result)
+
+    @app.get("/v1/export/catalog")
+    def export_catalog(
+        request: Request, format: str = "json", snapshot: str | None = None
+    ) -> Response:
+        """REQ-700: Katalogausschnitt als JSON oder Turtle/SKOS (ADR-0005).
+
+        400 = unbekanntes Format oder unbekannter Snapshot. G6: beide
+        Formate tragen den Disclaimer (JSON-Feld bzw. Kommentarzeile).
+        """
+        store: ConceptStore = request.app.state.store
+        concepts: list[dict[str, object]] = []
+        for concept_id in store.concept_ids():
+            concept = store.get_concept(concept_id)
+            if concept is not None:
+                concepts.append(concept)
+        try:
+            if format == "json":
+                return JSONResponse(content=catalog_json(concepts, snapshot, DISCLAIMER))
+            if format == "ttl":
+                return Response(
+                    content=catalog_ttl(concepts, snapshot, DISCLAIMER),
+                    media_type="text/turtle",
+                )
+        except CatalogExportError as exc:
+            return JSONResponse(
+                status_code=400, content={"error": str(exc), "disclaimer": DISCLAIMER}
+            )
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": f"format muss 'json' oder 'ttl' sein (erhalten: {format!r})",
+                "disclaimer": DISCLAIMER,
+            },
+        )
 
     return app
 
