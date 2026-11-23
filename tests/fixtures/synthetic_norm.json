@@ -1,0 +1,53 @@
+{
+  "norm": "SYN 1",
+  "norm_id": "syn1-2020",
+  "edition": "2020",
+  "clauses": [
+    {
+      "number": "3.1",
+      "statement_type": "requirement",
+      "obligation": "muss",
+      "summary": "Synthetische Anforderung: Geschossflaeche wird gem. Platzhalter berechnet.",
+      "concepts": ["sia:concept/geschossflaeche", "sia:concept/nutzflaeche"]
+    },
+    {
+      "number": "3.2",
+      "statement_type": "requirement",
+      "obligation": "soll",
+      "summary": "Synthetische Empfehlung mit einem Begriff, der noch nicht im Katalog existiert.",
+      "concepts": ["sia:concept/geschossflaeche", "sia:concept/bauwerk"]
+    },
+    {
+      "number": "4.1",
+      "statement_type": "calculation",
+      "obligation": "muss",
+      "summary": "Synthetische Rechenbasis mit Beispiel-Tabelle und Beispiel-Formel.",
+      "concepts": ["sia:concept/nutzflaeche"],
+      "tables": [
+        {
+          "number": "T 3",
+          "statement_type": "classification",
+          "obligation": "informativ",
+          "summary": "Synthetische Tabelle T 3 (Platzhalterwerte, kein Norminhalt).",
+          "concepts": ["sia:concept/geschossflaeche"]
+        }
+      ],
+      "formulas": [
+        {
+          "number": "G 1",
+          "statement_type": "calculation",
+          "obligation": "muss",
+          "summary": "Synthetische Formel G 1 (Platzhalter, kein Norminhalt).",
+          "concepts": ["sia:concept/nutzflaeche"]
+        }
+      ]
+    },
+    {
+      "number": "5.5",
+      "statement_type": "reference",
+      "obligation": "kann",
+      "summary": "Synthetischer Verweis, dessen Begriffe noch nicht im Katalog existieren.",
+      "concepts": ["sia:concept/brandschutz", "sia:concept/raeumliche-trennung"]
+    }
+  ]
+}
