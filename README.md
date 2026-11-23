@@ -17,6 +17,8 @@ Pilotnormen: SIA 416:2003, SIA 2024:2015 (Abstimmung mit Projekt SIA-Datenkatalo
 | Alle Prüfungen | `make check` (lint + typecheck + test + schema-validate) |
 | Benchmark | `make eval` → `reports/eval_<datum>.json` |
 | API lokal | `make run` → http://localhost:8000/docs |
+| Normdokument ingestieren | `make ingest NORM=<norm-id>` → Kandidaten in die Review Queue |
+| PDF-Extraktion (M8, ADR-0006) | `make extract NORM=<norm-id>` → `document.draft.json` im Mount |
 
 **Windows ohne natives `make`:** der Wrapper `make.cmd` übernimmt dieselben Targets.
 In PowerShell: `.\make.cmd <target>` (in `cmd.exe` funktioniert einfach `make <target>`).
