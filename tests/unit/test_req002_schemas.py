@@ -11,6 +11,7 @@ EXPECTED = {
     "answer.schema.json",
     "check_result.schema.json",
     "concept.schema.json",
+    "document_draft.schema.json",  # M8, ADR-0006
     "gap_report.schema.json",
     "norm_statement.schema.json",
     "rule.schema.json",

@@ -27,8 +27,12 @@
      `data/norms/<norm-id>/document.draft.json`: Ziffern-Skelett
      (Ziffernnummern werden deterministisch aus dem Text erkannt,
      z. B. `3.1`, `4.2.1` am Zeilenanfang) plus extrahierter
-     Ziffern-Text je Ziffer (lokal, nur für die Vervollständigung;
-     kein Teil des Schemas `schemas/`). **Fachliche Felder werden
+     Ziffern-Text je Ziffer. Der Ziffern-Text ist eine lokale
+     Arbeitshilfe für die Vervollständigung und kein Teil des
+     document.json-Vertrags (dort gilt: `summary` = eigene
+     Zusammenfassung, kein Normzitat). Der gesamte Entwurf wird
+     gegen ein neues Schema validiert (siehe unten in diesem Punkt).
+      **Fachliche Felder werden
      nicht von der Maschine gesetzt** (G1): `statement_type`,
      `obligation`, `summary`, `concepts` bleiben im Entwurf leer –
      ihre Belegung ist Facharbeit (Mensch) bzw. LLM-Aufgabe nach

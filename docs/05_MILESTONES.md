@@ -42,3 +42,9 @@ Jeder Milestone ist erst fertig, wenn alle Kriterien als Test existieren und gr�
 - REQ-700: Export Katalogausschnitt als JSON und Turtle (SKOS)
 - REQ-701: Regel → IDS-Spezifikation (wo abbildbar), sonst GapReport `not_ids_expressible`
 - REQ-702: Prüfergebnisse `fail` als BCF-Topic exportierbar
+
+## M8 – Echte Normdokumente: PDF-Extraktion (OQ-003, ADR-0006)
+- REQ-800: Given ein PDF unter `data/norms/<norm-id>/document.pdf` When `make extract NORM=<norm-id>` Then entsteht `document.draft.json` mit Ziffern-Skelett (Ziffernnummern am Zeilenanfang, deterministisch) und extrahiertem Ziffern-Text; Fachfelder bleiben leer; der Entwurf ist validiert gegen `document_draft.schema.json`
+- REQ-801: Extraktion ist atomar: alle Fehler werden gesammelt als Bericht geliefert; bei Fehlern wird keine Datei geschrieben (KBOB-Muster)
+- REQ-802: G4: Fehlerbericht und CLI-Ausgabe enthalten nur Norm-ID, Ziffern, Feldnamen und Zählungen – nie Normtexte
+- REQ-803: Given ein extrahierter Entwurf When die Fachperson die `document.json` vervollständigt (Stufe 2, manuell) Then erzeugt die bestehende Ingest-Pipeline (M2) unverändert Kandidaten mit Fundstelle

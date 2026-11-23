@@ -1,4 +1,5 @@
-"""Plattformuebergreifendes Make-Aequivalent: setup | check | eval | run | ingest (REQ-000/REQ-200).
+"""Plattformuebergreifendes Make-Aequivalent: setup | check | eval | run | ingest | extract
+(REQ-000/REQ-200/REQ-800).
 
 Wird aufgerufen von:
 - Makefile (Linux/macOS/CI)
@@ -21,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 VENV_DIR = ROOT / ".venv"
 MIN_VERSION = (3, 12)
 PREFERRED_VERSIONS = ("3.12", "3.13", "3.14")
-TARGETS = ("setup", "check", "eval", "run", "ingest")
+TARGETS = ("setup", "check", "eval", "run", "ingest", "extract")
 PROBE_VERSION = "import sys; raise SystemExit(0 if sys.version_info >= {min_version} else 1)"
 PROBE_EXECUTABLE = "import sys; print(sys.executable)"
 
@@ -115,6 +116,15 @@ def cmd_ingest(norm_id: str | None) -> int:
     return 0
 
 
+def cmd_extract(norm_id: str | None) -> int:
+    py = str(ensure_venv())
+    if not norm_id:
+        print("make: extract braucht eine Norm-ID: make extract NORM=<norm-id>")
+        return 2
+    _run([py, "-m", "sni.ingest", "extract", norm_id])
+    return 0
+
+
 def cmd_run() -> int:
     py = str(ensure_venv())
     port = os.environ.get("PORT", "8000")
@@ -143,13 +153,13 @@ def _parse_norm_arg(arg: str) -> str | None:
 def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
     if not args or args[0] not in TARGETS:
-        print(f"Verwendung: make <{' | '.join(TARGETS)}> [ingest: NORM=<norm-id>]")
+        print(f"Verwendung: make <{' | '.join(TARGETS)}> [ingest/extract: NORM=<norm-id>]")
         return 2
     target = args[0]
     norm_id: str | None = None
-    if target == "ingest":
+    if target in ("ingest", "extract"):
         if len(args) > 2:
-            print("Verwendung: make ingest NORM=<norm-id>")
+            print(f"Verwendung: make {target} NORM=<norm-id>")
             return 2
         if len(args) == 2:
             norm_id = _parse_norm_arg(args[1])
@@ -159,6 +169,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if target == "ingest":
             return cmd_ingest(norm_id)
+        if target == "extract":
+            return cmd_extract(norm_id)
         return HANDLERS[target]()
     except MakeError as exc:
         print(f"make: {exc}", file=sys.stderr)

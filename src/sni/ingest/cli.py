@@ -1,4 +1,5 @@
-"""CLI: ``python -m sni.ingest <norm-id>`` (Make-Target: ``make ingest NORM=<norm-id>``)."""
+"""CLI: ``python -m sni.ingest <norm-id>`` und ``python -m sni.ingest extract <norm-id>``
+(Make-Targets: ``make ingest NORM=<norm-id>``, ``make extract NORM=<norm-id>``)."""
 
 from __future__ import annotations
 
@@ -6,6 +7,7 @@ import sys
 from pathlib import Path
 
 from sni.catalog.store import ConceptStore
+from sni.ingest.pdf_extract import PdfExtractError, extract_pdf
 from sni.ingest.pipeline import (
     DEFAULT_NORMS_DIR,
     DEFAULT_QUEUE_DIR,
@@ -26,10 +28,15 @@ def main(
     queue_dir: Path | None = None,
     catalog_db: Path | None = None,
 ) -> int:
-    """Einstiegspunkt; liefert 0 (OK), 1 (Ingest-Fehler) oder 2 (Aufruferfehler)."""
+    """Einstiegspunkt; liefert 0 (OK), 1 (Verarbeitungsfehler) oder 2 (Aufruferfehler)."""
     args = sys.argv[1:] if argv is None else argv
+    if args and args[0] == "extract":
+        if len(args) != 2:
+            print("Verwendung: python -m sni.ingest extract <norm-id>")
+            return 2
+        return _run_extract(args[1], norms_dir if norms_dir is not None else DEFAULT_NORMS_DIR)
     if len(args) != 1:
-        print("Verwendung: python -m sni.ingest <norm-id>")
+        print("Verwendung: python -m sni.ingest <norm-id> | python -m sni.ingest extract <norm-id>")
         return 2
     norm_id = args[0]
     store = ConceptStore(catalog_db if catalog_db is not None else DEFAULT_CATALOG_DB)
@@ -51,4 +58,20 @@ def main(
     )
     for path in result.queue_files:
         print(f"  {path.name}")
+    return 0
+
+
+def _run_extract(norm_id: str, norms_dir: Path) -> int:
+    """Stufe 1 (ADR-0006): document.pdf → document.draft.json."""
+    try:
+        result = extract_pdf(norm_id, norms_dir)
+    except PdfExtractError as exc:
+        for line in exc.report:
+            print(f"FEHLER: {line}", file=sys.stderr)
+        return 1
+    # G4: nur ID, Ziffern und Zählungen, nie Normtexte.
+    seiten = f"{result.pages} Seite{'n' if result.pages != 1 else ''}"
+    # ASCII-sicher (Windows-Konsole/PIPE kann cp1252 sein): kein Unicode-Pfeil.
+    name = result.draft_path.name
+    print(f"[extract] {result.norm_id}: {result.clauses} Ziffern, {seiten} -> {name}")
     return 0
