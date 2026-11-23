@@ -1,19 +1,25 @@
-"""Benchmark-Runner: Critical Failure Rate (M4, REQ-402; docs/06_TESTING.md).
+"""Benchmark-Runner: Critical Failure Rate und Kennzahlen (REQ-402/600/601).
 
 Faelle: ``tests/benchmark/*.yaml``, erstellt von Fachpersonen. Faelle mit
 ``<...>``-Platzhaltern sind noch nicht fachlich ausgefuehrt und werden
 gezippt (nicht gezaehlt).
 
 Critical Failure: Antwort fachlich falsch UND als ``normativ_belegt``
-klassifiziert. M4 vergleicht die Aussageklassen; der Vergleich von Werten
-und Fundstellen folgt in M6. Bei >0 kritischen Faelen liefert der Runner
-Exit-Code 1 (REQ-402: sonst waere ``make eval`` ein falsches Guenzeichen).
+klassifiziert. Bei >0 kritischen Faelen liefert der Runner Exit-Code 1
+(REQ-402: sonst waere ``make eval`` ein falsches Guenzeichen).
+
+M6 (REQ-600): der Report enthaelt alle Kennzahlen aus 00_VISION.md
+(Definitionen: docs/06_TESTING.md): Critical Failure Rate, class_accuracy,
+source_citation_accuracy, correct_abstention_rate, rule_calculation_accuracy.
+Nenner 0 -> null (nicht messbar). REQ-601: Feld ``failures`` listet jeden
+Fehlschlag mit Fall-ID, erwarteter und tatsächlicher Aussageklasse.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import sys
 import tempfile
@@ -27,9 +33,19 @@ import yaml
 from sni.catalog.snapshot import load_snapshot
 from sni.catalog.store import ConceptStore
 from sni.knowledge.store import KnowledgeBase, load_knowledge
-from sni.service.answerer import CLASS_NORMATIV_BELEGT, AnswerRequest, answer
+from sni.rules.engine import STATUS_OK, InputValue, evaluate
+from sni.service.answerer import (
+    CLASS_ABGELEITET,
+    CLASS_NICHT_EINDEUTIG,
+    CLASS_NORMATIV_BELEGT,
+    AnswerRequest,
+    answer,
+)
 
 PLACEHOLDER = re.compile(r"<[^<>]+>")
+# Toleranzen für den Wertvergleich, gemäss ADR-0004 (Konsistenzprüfung).
+REL_TOL = 1e-6
+ABS_TOL = 1e-9
 
 
 @dataclass(frozen=True)
@@ -42,13 +58,20 @@ class BenchmarkCase:
     expected_class: str
     project_data: dict[str, dict[str, object]] | None = None
     expected_rule: str | None = None
+    expected_sources: tuple[dict[str, str], ...] = ()
+    expected_value: tuple[float, str] | None = None
     note: str | None = None
     author: str | None = None
 
 
 @dataclass(frozen=True)
 class CaseResult:
-    """Auswertung eines Falls (M4: Klassenvergleich)."""
+    """Auswertung eines Falls.
+
+    ``correct`` = Aussageklasse stimmt (REQ-402). ``citation_ok``,
+    ``abstention_ok``, ``calculation_ok`` sind die REQ-600-Kennzahlen je
+    Fall; ``None`` = Kennzahl auf diesen Fall nicht anwendbar.
+    """
 
     case_id: str
     category: str
@@ -59,6 +82,9 @@ class CaseResult:
     correct: bool
     critical: bool
     details: list[str] = field(default_factory=list)
+    citation_ok: bool | None = None
+    abstention_ok: bool | None = None
+    calculation_ok: bool | None = None
 
 
 def load_cases(benchmark_dir: Path) -> tuple[list[BenchmarkCase], list[str]]:
@@ -136,6 +162,53 @@ def _parse_case(file_name: str, entry: Mapping[str, object]) -> BenchmarkCase:
                 )
             value_dict: dict[str, object] = {str(k): v for k, v in raw_value.items()}
             project_data[concept] = value_dict
+
+    raw_sources: object = entry.get("expected_sources")
+    expected_sources: list[dict[str, str]] = []
+    if raw_sources is not None:
+        if not isinstance(raw_sources, list) or not raw_sources:
+            raise ValueError(
+                f"{file_name}: Fall {entry.get('id')!r}: 'expected_sources' muss "
+                "eine nicht leere Liste sein"
+            )
+        for item in raw_sources:
+            if not isinstance(item, dict):
+                raise ValueError(
+                    f"{file_name}: Fall {entry.get('id')!r}: 'expected_sources'-Eintrag "
+                    "muss ein Objekt sein"
+                )
+            source: dict[str, str] = {}
+            for key in ("norm", "edition", "clause"):
+                value: object = item.get(key)
+                if not isinstance(value, str) or not value.strip():
+                    raise ValueError(
+                        f"{file_name}: Fall {entry.get('id')!r}: "
+                        f"'expected_sources[].[{key}]' fehlt oder ist leer"
+                    )
+                source[key] = value
+            expected_sources.append(source)
+
+    raw_expected_value: object = entry.get("expected_value")
+    expected_value: tuple[float, str] | None = None
+    if raw_expected_value is not None:
+        if not isinstance(raw_expected_value, Mapping):
+            raise ValueError(
+                f"{file_name}: Fall {entry.get('id')!r}: 'expected_value' muss ein "
+                "Objekt {value, unit} sein"
+            )
+        expected_number: object = raw_expected_value.get("value")
+        expected_unit: object = raw_expected_value.get("unit")
+        if isinstance(expected_number, bool) or not isinstance(expected_number, (int, float)):
+            raise ValueError(
+                f"{file_name}: Fall {entry.get('id')!r}: 'expected_value.value' muss eine Zahl sein"
+            )
+        if not isinstance(expected_unit, str) or not expected_unit.strip():
+            raise ValueError(
+                f"{file_name}: Fall {entry.get('id')!r}: 'expected_value.unit' muss "
+                "eine nicht leere Zeichenkette sein"
+            )
+        expected_value = (float(expected_number), expected_unit)
+
     return BenchmarkCase(
         id=required("id"),
         category=required("category"),
@@ -143,6 +216,8 @@ def _parse_case(file_name: str, entry: Mapping[str, object]) -> BenchmarkCase:
         expected_class=required("expected_class"),
         project_data=project_data,
         expected_rule=optional("expected_rule"),
+        expected_sources=tuple(expected_sources),
+        expected_value=expected_value,
         note=optional("note"),
         author=optional("author"),
     )
@@ -156,28 +231,27 @@ def run_benchmark(
     """Führt alle Faelle aus; liefert (Resultate, Anzahl kritischer Faelle)."""
     results: list[CaseResult] = []
     for case in cases:
+        answer_obj: dict[str, object] | None = None
+        details: list[str] = []
         try:
-            result = answer(AnswerRequest(case.question, case.project_data), kb, catalog)
-            actual: object = result.get("answer_class")
-            actual_class = actual if isinstance(actual, str) else None
+            answer_obj = answer(AnswerRequest(case.question, case.project_data), kb, catalog)
+            raw_actual: object = answer_obj.get("answer_class")
+            actual_class: str | None = raw_actual if isinstance(raw_actual, str) else None
         except Exception as exc:  # ein einzelner Fall darf den Lauf nicht brechen
-            results.append(
-                CaseResult(
-                    case.id,
-                    case.category,
-                    case.question,
-                    case.expected_class,
-                    None,
-                    True,
-                    False,
-                    False,
-                    [f"Auswertung fehlgeschlagen: {exc}"],
-                )
-            )
-            continue
+            actual_class = None
+            details.append(f"Auswertung fehlgeschlagen: {exc}")
         correct = actual_class == case.expected_class
         critical = (not correct) and actual_class == CLASS_NORMATIV_BELEGT
-        details = [] if correct else [f"erwartet: {case.expected_class}, erhalten: {actual_class}"]
+        if not correct:
+            details.append(f"erwartet: {case.expected_class}, erhalten: {actual_class}")
+        citation_ok, citation_details = _check_citation(case, actual_class, _sources_of(answer_obj))
+        abstention_ok, abstention_details = _check_abstention(case, actual_class)
+        calculation_ok, calculation_details = _check_calculation(
+            case, kb, actual_class, _supported_by(answer_obj)
+        )
+        details.extend(citation_details)
+        details.extend(abstention_details)
+        details.extend(calculation_details)
         results.append(
             CaseResult(
                 case.id,
@@ -189,9 +263,200 @@ def run_benchmark(
                 correct,
                 critical,
                 details,
+                citation_ok,
+                abstention_ok,
+                calculation_ok,
             )
         )
     return results, sum(1 for r in results if r.critical)
+
+
+def _check_citation(
+    case: BenchmarkCase,
+    actual_class: str | None,
+    sources: list[Mapping[str, object]],
+) -> tuple[bool | None, list[str]]:
+    """REQ-600: Fundstellen (Norm + Ausgabe + Ziffer) der Antwort korrekt?
+
+    Anwendbar nur für Faelle mit ``expected_class: normativ_belegt`` und
+    ``expected_sources``; jede erwartete Fundstelle muss in den
+    Antwort-Fundstellen vorkommen (exakte Übereinstimmung aller drei
+    Felder). ``None`` = nicht anwendbar.
+    """
+    if case.expected_class != CLASS_NORMATIV_BELEGT or not case.expected_sources:
+        return None, []
+    if actual_class != CLASS_NORMATIV_BELEGT:
+        return False, [
+            f"Fundstellenprüfung: Antwort ist {actual_class!r}, erwartet normativ_belegt"
+        ]
+    details: list[str] = []
+    for expected in case.expected_sources:
+        if not any(_same_source(source, expected) for source in sources):
+            details.append(
+                f"Fundstelle fehlt in Antwort: {expected['norm']} {expected['edition']} "
+                f"Ziffer {expected['clause']}"
+            )
+    return (not details), details
+
+
+def _same_source(source: Mapping[str, object], expected: Mapping[str, str]) -> bool:
+    return all(source.get(key) == expected[key] for key in ("norm", "edition", "clause"))
+
+
+def _check_abstention(
+    case: BenchmarkCase, actual_class: str | None
+) -> tuple[bool | None, list[str]]:
+    """REQ-600: unbeantwortbare Frage (erwartet ``nicht_eindeutig``) korrekt abgelehnt?"""
+    if case.expected_class != CLASS_NICHT_EINDEUTIG:
+        return None, []
+    if actual_class == CLASS_NICHT_EINDEUTIG:
+        return True, []
+    return False, [f"Enthaltung erwartet, erhalten {actual_class!r}"]
+
+
+def _check_calculation(
+    case: BenchmarkCase,
+    kb: KnowledgeBase,
+    actual_class: str | None,
+    supported_by: list[str],
+) -> tuple[bool | None, list[str]]:
+    """REQ-600: deterministischer Fall (erwartet ``abgeleitet``) korrekt?
+
+    Klasse ``abgeleitet`` UND — falls ``expected_value`` angegeben — der
+    Wert durch direkte Regelauswertung (M3-Engine, unabhängig vom
+    Antwortpfad) bestätigt, inkl. Einheit und ADR-0004-Toleranzen.
+    """
+    if case.expected_class != CLASS_ABGELEITET:
+        return None, []
+    if actual_class != CLASS_ABGELEITET:
+        return False, [f"Regelrechnung erwartet, Antwort ist {actual_class!r}"]
+    details: list[str] = []
+    rule_id = case.expected_rule
+    if rule_id is not None and rule_id not in supported_by:
+        details.append(f"Antwort beruht nicht auf der erwarteten Regel {rule_id}")
+    if rule_id is None:
+        rule_ids = sorted(ref for ref in supported_by if ":rule/" in ref)
+        rule_id = rule_ids[0] if len(rule_ids) == 1 else None
+    if case.expected_value is None:
+        return (not details), details
+    rule: dict[str, object] | None = kb.rules.get(rule_id) if rule_id is not None else None
+    if rule is None:
+        return False, details + [
+            f"Regel {rule_id!r} nicht verfügbar; expected_value nicht überprüfbar"
+        ]
+    inputs = _to_inputs(case.project_data)
+    if inputs is None:
+        return False, details + ["Projektdaten ungültig; expected_value nicht überprüfbar"]
+    result = evaluate(rule, inputs)
+    expected_value, expected_unit = case.expected_value
+    if result.status != STATUS_OK or result.value is None:
+        return False, details + [
+            f"Regelauswertung fehlgeschlagen: {'; '.join(result.report) or 'kein Wert'}"
+        ]
+    if result.unit != expected_unit:
+        return False, details + [f"Einheit erwartet {expected_unit}, Regel liefert {result.unit!r}"]
+    if not math.isclose(result.value, expected_value, rel_tol=REL_TOL, abs_tol=ABS_TOL):
+        return False, details + [
+            f"expected_value {expected_value:g} {expected_unit}, "
+            f"Regel berechnet {result.value:g} {result.unit}"
+        ]
+    return (not details), details
+
+
+def _to_inputs(
+    project_data: Mapping[str, Mapping[str, object]] | None,
+) -> dict[str, InputValue] | None:
+    """Projektdaten -> Engine-Inputs; None bei ungültigen Werten (wie Answerer)."""
+    if project_data is None:
+        return {}
+    inputs: dict[str, InputValue] = {}
+    for concept, raw in project_data.items():
+        value: object = raw.get("value")
+        unit: object = raw.get("unit")
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        if not isinstance(unit, str) or not unit.strip():
+            return None
+        inputs[concept] = InputValue(float(value), unit)
+    return inputs
+
+
+def _sources_of(answer_obj: dict[str, object] | None) -> list[Mapping[str, object]]:
+    if answer_obj is None:
+        return []
+    raw: object = answer_obj.get("sources", [])
+    if not isinstance(raw, list):
+        return []
+    return [source for source in raw if isinstance(source, Mapping)]
+
+
+def _supported_by(answer_obj: dict[str, object] | None) -> list[str]:
+    if answer_obj is None:
+        return []
+    raw: object = answer_obj.get("claims", [])
+    if not isinstance(raw, list):
+        return []
+    refs: list[str] = []
+    for claim in raw:
+        if not isinstance(claim, Mapping):
+            continue
+        supported: object = claim.get("supported_by")
+        if isinstance(supported, list):
+            refs.extend(ref for ref in supported if isinstance(ref, str))
+    return refs
+
+
+def compute_metrics(results: list[CaseResult]) -> dict[str, object]:
+    """REQ-600: alle Kennzahlen aus 00_VISION.md (Definitionen: docs/06_TESTING.md).
+
+    Nenner 0 -> null (nicht messbar); die Critical Failure Rate bleibt
+    0.0 bei 0 ausgeführten Faelen (REQ-402-Verhalten).
+    """
+    executed = [r for r in results if r.executed]
+    n = len(executed)
+    passed = sum(1 for r in executed if r.correct)
+    critical = sum(1 for r in executed if r.critical)
+    citation = [r for r in executed if r.citation_ok is not None]
+    abstention = [r for r in executed if r.abstention_ok is not None]
+    deterministic = [r for r in executed if r.calculation_ok is not None]
+    return {
+        "critical_failures": critical,
+        "critical_failure_rate": round(critical / n, 4) if n else 0.0,
+        "class_accuracy": round(passed / n, 4) if n else None,
+        "source_citation_accuracy": _rate(
+            sum(1 for r in citation if r.citation_ok is True), len(citation)
+        ),
+        "source_citation_cases": len(citation),
+        "correct_abstention_rate": _rate(
+            sum(1 for r in abstention if r.abstention_ok is True), len(abstention)
+        ),
+        "abstention_cases": len(abstention),
+        "rule_calculation_accuracy": _rate(
+            sum(1 for r in deterministic if r.calculation_ok is True), len(deterministic)
+        ),
+        "deterministic_cases": len(deterministic),
+    }
+
+
+def _rate(numerator: int, denominator: int) -> float | None:
+    """Anteil (gerundet auf 4 Stellen); Nenner 0 -> null (nicht messbar)."""
+    return round(numerator / denominator, 4) if denominator else None
+
+
+def build_failures(results: list[CaseResult]) -> list[dict[str, object]]:
+    """REQ-601: jeder Fehlschlag mit Fall-ID, erwarteter und tatsächlicher Klasse."""
+    return [
+        {
+            "id": r.case_id,
+            "category": r.category,
+            "expected_class": r.expected_class,
+            "actual_class": r.actual_class,
+            "critical": r.critical,
+            "details": r.details,
+        }
+        for r in results
+        if r.executed and not r.correct
+    ]
 
 
 def main_eval(
@@ -218,6 +483,7 @@ def main_eval(
             store.close()
     executed = sum(1 for r in results if r.executed)
     passed = sum(1 for r in results if r.executed and r.correct)
+    metrics = compute_metrics(results)
     report: dict[str, object] = {
         "date": date.today().isoformat(),
         "benchmark_dir": str(benchmark_dir),
@@ -228,10 +494,14 @@ def main_eval(
         "skipped": skipped,
         "passed": passed,
         "failed": executed - passed,
-        "critical_failures": critical,
-        "critical_failure_rate": round(critical / executed, 4) if executed else 0.0,
+        **metrics,
         "status": "ok" if critical == 0 else "critical",
-        "note": "M4: Vergleich der Aussageklassen; Wert-/Fundstellen-Vergleich folgt in M6.",
+        "failures": build_failures(results),
+        "note": (
+            "REQ-600: alle Kennzahlen aus 00_VISION.md (Definitionen: "
+            "docs/06_TESTING.md); Nenner 0 -> null. REQ-601: Failures mit "
+            "Fall-ID, erwarteter und tatsächlicher Klasse."
+        ),
         "cases": [
             {
                 "id": r.case_id,
