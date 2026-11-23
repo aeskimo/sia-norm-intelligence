@@ -12,6 +12,7 @@ dependencies = [
     "pydantic>=2.7",
     "uvicorn>=0.30",
     "jsonschema>=4.23",
+    "ifcopenshell>=0.9.0",
 ]
 
 [project.optional-dependencies]
@@ -44,3 +45,7 @@ select = ["E", "W", "F", "I", "UP", "B", "SIM"]
 strict = true
 python_version = "3.12"
 mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = ["ifcopenshell.*"]
+ignore_missing_imports = true
