@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sni:concept",
+  "type": "object",
+  "required": ["id", "name", "definition", "catalog_snapshot"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z]+:concept/[a-z0-9-]+(@[0-9.]+)?$"},
+    "name": {"$ref": "#/$defs/ml"},
+    "abbreviation": {"type": "string"},
+    "definition": {"$ref": "#/$defs/ml"},
+    "quantity_type": {"type": "string"},
+    "unit": {"type": "string"},
+    "relations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "target"],
+        "properties": {
+          "type": {"enum": ["part_of", "has_part", "specialization_of", "derived_from", "related_to"]},
+          "target": {"type": "string"}
+        }
+      }
+    },
+    "mappings": {"type": "object", "description": "z. B. {\"ifc\": \"...\", \"bsdd\": \"...\"}"},
+    "catalog_snapshot": {"type": "string"}
+  },
+  "$defs": {
+    "ml": {"type": "object", "required": ["de"],
+      "properties": {"de": {"type": "string"}, "fr": {"type": "string"}, "it": {"type": "string"}, "en": {"type": "string"}}}
+  }
+}

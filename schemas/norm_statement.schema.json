@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sni:norm_statement",
+  "type": "object",
+  "required": ["id", "source", "concepts", "statement_type", "obligation", "review_status"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z]+:statement/"},
+    "source": {"$ref": "source_reference.schema.json"},
+    "concepts": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "statement_type": {"enum": ["definition", "requirement", "classification", "calculation", "reference", "exception"]},
+    "obligation": {"enum": ["muss", "soll", "kann", "informativ"]},
+    "summary": {"type": "string", "description": "Eigene Zusammenfassung, kein Normzitat"},
+    "conditions": {"type": "array", "items": {"type": "string"}},
+    "refers_to": {"type": "array", "items": {"type": "string"}},
+    "valid_from": {"type": "string", "format": "date"},
+    "valid_until": {"type": "string", "format": "date"},
+    "review_status": {"enum": ["candidate", "reviewed", "approved", "rejected"]},
+    "approved_by": {"type": "string"},
+    "approved_at": {"type": "string", "format": "date"}
+  },
+  "if": {"properties": {"review_status": {"const": "approved"}}},
+  "then": {"required": ["approved_by", "approved_at"]}
+}

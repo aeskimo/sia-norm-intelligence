@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sni:rule",
+  "type": "object",
+  "required": ["id", "derived_from", "inputs", "output", "expression", "review_status"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z]+:rule/"},
+    "derived_from": {"type": "array", "minItems": 1, "items": {"type": "string"}, "description": "NormStatement-IDs"},
+    "inputs": {"type": "array", "items": {"type": "object", "required": ["concept", "unit"],
+      "properties": {"concept": {"type": "string"}, "unit": {"type": "string"}, "required": {"type": "boolean", "default": true}}}},
+    "output": {"type": "object", "required": ["concept", "unit"],
+      "properties": {"concept": {"type": "string"}, "unit": {"type": "string"}}},
+    "expression": {"type": "string", "description": "Sichere Ausdruckssprache, z. B. 'NGF + KF'"},
+    "applicability": {"type": "string", "description": "Bedingung, wann die Regel gilt"},
+    "review_status": {"enum": ["candidate", "reviewed", "approved", "rejected"]}
+  }
+}

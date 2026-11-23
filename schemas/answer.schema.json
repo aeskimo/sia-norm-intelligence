@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sni:answer",
+  "type": "object",
+  "required": ["question", "answer_class", "text", "claims", "disclaimer"],
+  "properties": {
+    "question": {"type": "string"},
+    "answer_class": {"enum": ["normativ_belegt", "abgeleitet", "fachliche_interpretation", "projektfestlegung", "nicht_eindeutig"]},
+    "text": {"type": "string"},
+    "claims": {"type": "array", "items": {"type": "object", "required": ["claim", "supported_by", "verified"],
+      "properties": {"claim": {"type": "string"}, "supported_by": {"type": "array", "items": {"type": "string"}}, "verified": {"type": "boolean"}}}},
+    "sources": {"type": "array", "items": {"$ref": "source_reference.schema.json"}},
+    "missing_information": {"type": "array", "items": {"type": "string"}},
+    "disclaimer": {"type": "string"}
+  }
+}

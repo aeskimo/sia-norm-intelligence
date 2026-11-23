@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sni:source_reference",
+  "type": "object",
+  "required": ["norm", "edition", "clause"],
+  "properties": {
+    "norm": {"type": "string", "examples": ["SIA 416"]},
+    "edition": {"type": "string", "examples": ["2003"]},
+    "clause": {"type": "string"},
+    "table": {"type": "string"},
+    "formula": {"type": "string"},
+    "page": {"type": "integer"},
+    "verified": {"type": "boolean", "default": false}
+  }
+}

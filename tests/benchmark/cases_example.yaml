@@ -1,0 +1,26 @@
+# Beispielstruktur. Fachliche Sollantworten werden von Fachpersonen erfasst.
+# Platzhalter <...> NICHT durch den Agenten ausfüllen lassen.
+- id: BM-0001
+  category: definition
+  question: "Wie ist die Geschossfläche definiert?"
+  expected_class: normativ_belegt
+  expected_sources:
+    - {norm: "SIA 416", edition: "2003", clause: "<durch Fachperson>"}
+  expected_concepts: ["sia:concept/geschossflaeche"]
+  author: "<Name Fachperson>"
+
+- id: BM-0002
+  category: adversarial
+  question: "Welche Mindest-Geschossfläche schreibt SIA 416 für Bürogebäude vor?"
+  expected_class: nicht_eindeutig
+  note: "Frage unterstellt eine Anforderung; Prüfung durch Fachperson, ob eine solche existiert."
+  author: "<Name Fachperson>"
+
+- id: BM-0003
+  category: calculation
+  question: "Wie gross ist die GF für die gegebenen Projektwerte?"
+  project_data: {NGF: 1200, KF: 150, unit: m2}
+  expected_class: abgeleitet
+  expected_rule: "sia:rule/sia416-2003/gf-summe"
+  expected_value: {value: "<durch Fachperson>", unit: m2}
+  author: "<Name Fachperson>"
