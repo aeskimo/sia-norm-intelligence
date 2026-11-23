@@ -127,3 +127,189 @@ Format pro Eintrag:
   Projektdaten mit der Regel, keine Normkonformität; Constraint-/
   Grenzwertfelder in rule.schema.json (Option B) = Follow-up-ADR, sobald
   fachlich konkret (z. B. "GF ≤ 5000 m2").
+
+## OQ-006: Technisches Design des M7-Export-Moduls (Abhängigkeiten, Endpunkte)
+- Kontext: 05_MILESTONES.md M7 (REQ-700/701/702); AGENTS.md §5 (keine neuen
+  Laufzeit-Abhängigkeiten ohne ADR); 03_ARCHITECTURE.md (Export-Endpoints ab
+  M7, `api/` ohne Fachlogik). Verifizierte Zielformate (2026-11-23,
+  Quellen): BCF 2.1 = XML in ZIP, offizielle Spec buildingSMART/BCF-XML
+  (release_2_1, XSDs geprüft: `bcf.version` VersionId="2.1", optionale
+  `project.bcfp`, `<topic-guid>/markup.bcf` mit Pflichtfeldern
+  Guid/Title/CreationDate/CreationAuthor; File-Extension `.bcf`); IDS 1.0
+  = XML, buildingSMART/IDS (v1.0.0, ids.xsd geprüft: `<ids>` mit `<info>`
+  + `<specifications>`, je `<specification name ifcVersion identifier>`
+  mit `<applicability>` + `<requirements>`, Facets entity/partOf/
+  classification/attribute/property/material, cardinality
+  required|optional|prohibited, Werte-Einschränkungen via
+  xs:restriction, keine arithmetischen Ausdrücke); KBOB natdd-core.ttl
+  (CC0) als Turtle-Stil-Vorbild.
+- Frage: Welches technische Design für die drei Exporte: welche
+  Laufzeit-Abhängigkeiten, welche Modulstruktur, welche API-Endpunkte?
+- Optionen: A) Keine neuen Laufzeit-Abhängigkeiten: handgeschriebene
+  Serialisierer in neuem Modul `src/sni/export/` (`skos.py`, `ids.py`,
+  `bcf.py`), stdlib-only (`json`, `zipfile`, `xml.etree.ElementTree`);
+  `api/` verdrahtet nur die Endpunkte.
+    - REQ-700: `GET /v1/export/catalog?format=json|ttl[&snapshot=<id>]`;
+      JSON = Array schemakonformer Concepts + `disclaimer`; TTL =
+      handgeschriebenes Turtle (SKOS-Mapping nach OQ-007).
+    - REQ-702: `POST /v1/export/bcf` mit CheckPayload (wie `POST
+      /v1/check`); Endpoint läuft die Prüfung intern (approved Regeln,
+      G3) und exportiert nur `fail`-Ergebnisse als BCF-Topics; Response:
+      binäre `.bcf`-Datei (ZIP); `reason`, `derived_from` (Fundstelle),
+      value/claimed/unit und G6-Disclaimer in `Description` des Topics;
+      `pass`/`insufficient_data`-Ergebnisse werden nicht exportiert.
+    - REQ-701: `POST /v1/export/ids` mit `{"rule_ids": [...]}` (leer =
+      alle approved Regeln); Response: JSON `{"ids_xml": <IDS-XML-String
+      oder null>, "gaps": [GapReport], "disclaimer"}` (Kriterien:
+      OQ-008).
+    - Nur `approved`-Objekte werden exportiert (G3, wie Check-Service).
+  B) Laufzeit-Abhängigkeiten ergänzen (z. B. `rdflib` für Turtle/SKOS,
+  `bettercorrectfast` für BCF); weniger handgeschriebener Code, aber neue
+  Abhängigkeiten (ADR-Pflicht gemäss AGENTS.md §5) und
+  Abhängigkeitsketten (BetterCorrectFast = lokal vendorer Fork der
+  IfcOpenShell-bcf-Bibliothek).
+- Empfehlung Agent: A – AGENTS.md §5 verbietet neue Laufzeit-Abhängigkeiten
+  ohne ADR, und keines der drei Formate verlangt sie: BCF 2.1 = drei
+  kleine XML-Dateien (XSD-geprüft), IDS 1.0 = eine XML-Datei
+  (XSD-geprüft), Turtle = handgeschreibbar (KBOB-Vorbild, CC0). stdlib
+  `zipfile` + `ElementTree` genügen; die exakten Felder dokumentiert
+  ADR-0005.
+- Blockiert: – (beantwortet; Umsetzung in M7, REQ-700/701/702)
+- Status: beantwortet (User-Entscheid Option A, 2026-11-23)
+- Antwort: ADR-0005 (2026-11-23), Option A: keine neuen
+  Laufzeit-Abhängigkeiten; neues Modul `src/sni/export/`
+  (`skos.py`, `ids.py`, `bcf.py`, nur stdlib: `json`, `zipfile`,
+  `xml.etree.ElementTree`); `api/` verdrahtet nur die Endpunkte:
+  `GET /v1/export/catalog?format=json|ttl[&snapshot=<id>]`
+  (REQ-700), `POST /v1/export/bcf` mit CheckPayload – läuft die
+  Prüfung intern (approved Regeln, G3) und exportiert nur
+  `fail`-Ergebnisse als BCF 2.1-Topics (binäre `.bcf`-ZIP-Response)
+  (REQ-702), `POST /v1/export/ids` mit `{"rule_ids": [...]}`
+  (leer = alle approved) – Response `{"ids_xml", "gaps",
+  "disclaimer"}` (REQ-701). Nur approved-Objekte werden exportiert
+  (G3); jede Export-Antwort trägt den G6-Disclaimer.
+
+## OQ-007: SKOS/RDF-Mapping und Namespace für den TTL-Export (REQ-700)
+- Kontext: schemas/concept.schema.json (name/definition mehrsprachig
+  de/fr/it, abbreviation, quantity_type, unit, relations mit fünf Typen
+  part_of/has_part/specialization_of/derived_from/related_to, mappings
+  als freies Objekt, catalog_snapshot); KBOB natdd-core.ttl (CC0: eigenes
+  Vokabular `dd:` für Nicht-SKOS-Felder, skos/dcterms/dcat als
+  Standardvokabular, provisorischer Namespace mit dokumentierter
+  Migrations-Policy); 08_REFERENCES.md Punkt 4 (Standardvokabular
+  wiederverwenden: DCAT, Dublin Core, SKOS, PROV-O, QUDT).
+- Frage: Wie werden die fünf Relationstypen und die Zusatzfelder (unit,
+  quantity_type, mappings, catalog_snapshot) auf RDF abgebildet, und
+  welche Namespace-IRIs werden für die Prefixe `sia:` (Concept-IDs) und
+  `sni:` (eigene Properties) verwendet?
+- Optionen: A) Standardvokabular dort, wo eine 1:1-Semantik besteht,
+  sonst eigenes `sni:`:
+    - name → `skos:prefLabel` (sprachgetaggt @de/@fr/@it)
+    - definition → `skos:definition` (sprachgetaggt)
+    - abbreviation → `skos:altLabel`
+    - specialization_of → `skos:broader` (spezialisierter Concept zeigt
+      auf den allgemeineren)
+    - part_of → `dcterms:isPartOf`; has_part → `dcterms:hasPart`
+    - derived_from → `prov:wasDerivedFrom`
+    - related_to → `skos:related`
+    - unit → `sni:unit`; quantity_type → `sni:quantityType` (Strings)
+    - mappings → `sni:mappings` auf Blank-Node mit je einer Property pro
+      Key (z. B. `sni:ifc`, `sni:bsdd`)
+    - catalog_snapshot → `sni:catalogSnapshot`
+    - Concept-IRI: Prefix `sia:` → `https://sia-norm-intelligence.dev/sia/`
+      (Concept-IDs sind dadurch bereits IRIs); Header: je Snapshot ein
+      `skos:ConceptScheme` (IRI ab Snapshot-ID) + `dcterms:title`,
+      Concepts via `skos:inScheme`.
+  B) Minimal: nur `skos:Concept` + `skos:prefLabel` + `skos:definition`
+  standardisiert; alle übrigen Felder (inkl. aller fünf Relationstypen)
+  als `sni:`-Eigendefinitionen.
+- Empfehlung Agent: A – 08_REFERENCES.md Punkt 4 weist explizit auf
+  Wiederverwendung von Standardvokabularen (insb. PROV-O für Herleitung,
+  Dublin Core für Teil-von-Relationen); jeder der fünf Relationstypen
+  hat eine vertretbare Standard-Gegenstelle ohne Semantik-Verzerrung;
+  `sni:` beschränkt sich auf die vier Felder ohne Standard-Gegenstück
+  (KBOB-Vorbild: eigenes Vokabular für Nicht-SKOS-Felder). Namespaces:
+  `sia:` → `https://sia-norm-intelligence.dev/sia/`, `sni:` →
+  `https://sia-norm-intelligence.dev/ns/`, beide provisorisch mit
+  dokumentierter Migrations-Policy (KBOB-Vorbild: Namespace kann vor
+  Publikation migrieren; Migrationsweg via IRI-Aliase in ADR + TTL-Header).
+- Blockiert: – (beantwortet; Umsetzung in M7, REQ-700)
+- Status: beantwortet (User-Entscheid Option A, 2026-11-23)
+- Antwort: ADR-0005 (2026-11-23), Option A: Standardvokabular,
+  wo 1:1-Semantik besteht, sonst `sni:`: name →
+  `skos:prefLabel` (@de/@fr/@it), definition → `skos:definition`,
+  abbreviation → `skos:altLabel`, specialization_of →
+  `skos:broader`, part_of → `dcterms:isPartOf`, has_part →
+  `dcterms:hasPart`, derived_from → `prov:wasDerivedFrom`,
+  related_to → `skos:related`, unit → `sni:unit`,
+  quantity_type → `sni:quantityType`, mappings → `sni:mappings`
+  (Blank-Node mit je einer Property pro Key),
+  catalog_snapshot → `sni:catalogSnapshot`. Namespaces
+  (provisorisch, Migrations-Policy gemäss KBOB-Vorbild): `sia:` →
+  `https://sia-norm-intelligence.dev/sia/` (Concept-IDs sind
+  dadurch IRIs), `sni:` → `https://sia-norm-intelligence.dev/ns/`;
+  je Snapshot ein `skos:ConceptScheme`, Concepts via
+  `skos:inScheme`.
+
+## OQ-008: IDS-Mappier-Kriterium für Regeln (REQ-701)
+- Kontext: 05_MILESTONES.md M7 REQ-701 ("wo abbildbar, sonst GapReport
+  `not_ids_expressible`"); schemas/rule.schema.json (inputs/output =
+  concept + unit, expression, applicability, derived_from); IDS 1.0
+  (buildingSMART/IDS v1.0.0): `<specification>` mit `<applicability>` +
+  `<requirements>`, Facets entity/attribute/property (propertySet +
+  baseName)/material/partOf/classification mit cardinality und
+  xs:restriction-Werteinschränkungen – **keine arithmetischen
+  Ausdrücke**, abgeleitete Größen (z. B. `Teilsfläche A + Teilsfläche
+  B`) sind in IDS nicht maschinenprüfbar; concept.schema.json `mappings`
+  = freies Objekt (Benchmark-Concepts aktuell ohne ifc-Mapping);
+  gap_report.schema.json kennt `not_ids_expressible` + target_layer
+  `mapping` (keine Schema-Änderung nötig).
+- Frage: Wann gilt eine Regel als "abbildbar", welche Form muss die
+  IFC-Mapping-Information eines Concepts haben, und wie verlaufen
+  nicht-abbildbare Regeln?
+- Optionen: A) Abbildbar = alle Input-Concepts UND das Output-Concept
+  tragen die IFC-Mapping-Form
+  `mappings.ifc = {"entity": "…", "property_set": "…", "base_name": "…"}`
+  (Dreier-Tupel, IFC4). Export pro abbildbaren Regeln: je ein
+  `<specification name=<Rule-ID> identifier=<Rule-ID>
+  ifcVersion="IFC4">` mit applicability = entity-Facet des
+  Output-Concepts; requirements = property-Facet (cardinality=required)
+  je Input- und Output-Concept; Herleitung (expression),
+  applicability-Text, Fundstelle (derived_from) und G6-Disclaimer in
+  `description`/`instructions` (menschenlesbar, in IDS nicht
+  maschinenprüfbar). Alle übrigen Regeln → GapReport
+  `not_ids_expressible` (target_layer=mapping, evidence=[Rule-ID],
+  description = benennt die Concepts ohne vollständiges ifc-Mapping).
+  Endpoint: `POST /v1/export/ids` (OQ-006), Response enthält `ids_xml`
+  (alle abbildbaren Regeln in einer Datei) + `gaps`.
+  B) Maximale Teilabbildung: jede Regel wird IDS-Specification (so viele
+  Facets wie möglich; fehlendes Mapping → kein Facet, Hinweis im
+  description); Gap nur, wenn kein Concept abbildbar ist.
+  C) Konservativ: v1 keine Regel abbildbar (alle approved Regeln ohne
+  vollständiges ifc-Mapping) → immer GapReport; Mapping = Follow-up.
+- Empfehlung Agent: A – maschinenprüfbar abbilden, wo die Daten es
+  zulassen, sonst ehrlicher Gap (G5: schwächere Klasse bei Zweifel). Das
+  Kriterium ist deterministisch, und beide Zweige sind testbar: Gap-Zweig
+  mit der bestehenden approved-Benchmark-Regel
+  `sia:rule/syn1-2020/gf-summe` (deren Concepts haben kein
+  ifc-Mapping); abbildbarer Zweig mit neuem synthetischen Fixture
+  (Concepts mit ifc-Mapping, z. B. `IfcSpace`/`Pset_SpaceCommon`/
+  `GrossFloorArea` – Platzhalter, G4). Die Tuple-Form von `mappings.ifc`
+  dokumentiert ADR-0005; das freie `mappings`-Objekt bleibt
+  schema-unverändert.
+- Blockiert: – (beantwortet; Umsetzung in M7, REQ-701)
+- Status: beantwortet (User-Entscheid Option A, 2026-11-23)
+- Antwort: ADR-0005 (2026-11-23), Option A: eine Regel ist
+  abbildbar, wenn alle Input-Concepts UND das Output-Concept
+  `mappings.ifc = {"entity", "property_set", "base_name"}`
+  (Dreier-Tupel, IFC4) tragen. Je abbildbarer approved Regel ein
+  `<specification ifcVersion="IFC4" name=<Rule-ID>
+  identifier=<Rule-ID>>`: applicability = entity-Facet des
+  Output-Concepts; requirements = property-Facet (cardinality
+  required) je Input- und Output-Concept; expression,
+  applicability-Text, Fundstelle (derived_from) und G6-Disclaimer
+  in `description`/`instructions` (menschenlesbar, in IDS nicht
+  maschinenprüfbar). Alle übrigen approved Regeln → GapReport
+  `not_ids_expressible` (target_layer=mapping, evidence=[Rule-ID],
+  description benennt die betroffenen Concepts). Keine
+  Teilabbildung (G5: schwächere Klasse bei Zweifel).

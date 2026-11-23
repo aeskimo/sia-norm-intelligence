@@ -4,6 +4,7 @@
 ```
 api/          FastAPI-Endpunkte, OpenAPI
 service/      Answering, Klassifikation, Compliance-Check
+export/       Export: SKOS/Turtle, IDS, BCF (M7)
 rules/        Regel-Engine (sichere Ausdrucksauswertung, kein eval())
 knowledge/    NormStatement, SourceReference, Editions
 catalog/      Concept, Property, Relation, Import CatalogSnapshot
@@ -12,6 +13,7 @@ projectdata/  IFC-/CSV-Adapter → normalisierte Projektwerte
 core/         Basistypen, IDs, Schemas, Fehler
 ```
 `core` hängt von nichts ab. `catalog` kennt `knowledge` nicht. `api` enthält keine Fachlogik.
+`export` hängt nur nach unten ab (`service`, `rules`, `catalog`), niemals umgekehrt.
 
 ## Verzeichnisstruktur
 ```
@@ -42,4 +44,6 @@ reports/                Eval-Ergebnisse
 | POST | `/v1/answer` | Frage → `Answer` (Schema `answer.schema.json`) |
 | POST | `/v1/check` | Projektdaten + Regel-IDs → Prüfergebnisse |
 | GET | `/v1/gaps` | GapReports als JSON |
-| GET | `/v1/export/catalog?format=json|ttl` | Export (Turtle/SKOS ab M7) |
+| GET | `/v1/export/catalog?format=json|ttl[&snapshot=<id>]` | Katalog-Export als JSON oder Turtle/SKOS (M7) |
+| POST | `/v1/export/bcf` | Prüfergebnisse `fail` → BCF-Topic-Datei (M7) |
+| POST | `/v1/export/ids` | Regeln → IDS-Spezifikation, sonst GapReport (M7) |
