@@ -11,6 +11,7 @@ import pytest
 
 from sni.catalog.snapshot import load_snapshot
 from sni.catalog.store import ConceptStore
+from sni.rules.engine import InputValue
 
 SNAPSHOT_ID = "sia:catalog/test@1.0.0"
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -84,6 +85,27 @@ def load_synthetic_norm() -> dict[str, object]:
 @pytest.fixture
 def synthetic_norm() -> dict[str, object]:
     return load_synthetic_norm()
+
+
+def load_synthetic_rule() -> dict[str, object]:
+    """Lädt die synthetische Test-Regel (G4: keine echten Norminhalte)."""
+    raw: object = json.loads((FIXTURES_DIR / "synthetic_rule.json").read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise AssertionError("synthetic_rule.json muss ein JSON-Objekt sein")
+    return raw
+
+
+@pytest.fixture
+def synthetic_rule() -> dict[str, object]:
+    return load_synthetic_rule()
+
+
+def rule_full_inputs() -> dict[str, InputValue]:
+    """Volle Inputs für die synthetische Regel (beide Pflicht-Concepts)."""
+    return {
+        "sia:concept/teilsflaeche-a": InputValue(100.0, "m2"),
+        "sia:concept/teilsflaeche-b": InputValue(50.0, "m2"),
+    }
 
 
 @pytest.fixture

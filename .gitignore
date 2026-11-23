@@ -19,5 +19,8 @@ data/catalog/*.db
 # Review Queue (regenerierbar durch make ingest)
 data/review_queue/*.json
 
+# Regeln (lokaler Mount, wie data/norms/)
+data/rules/*.json
+
 # Lizenzierte Normtexte – nie ins Repo (Guardrail G4)
 data/norms/
