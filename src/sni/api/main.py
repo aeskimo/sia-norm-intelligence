@@ -10,6 +10,7 @@ Hinweis G6: Jede fachliche API-Antwort trägt das Feld ``disclaimer``.
 from __future__ import annotations
 
 import atexit
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -17,6 +18,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from sni.catalog.store import ConceptStore
+from sni.export.bcf import BcfExportError, bcf_bytes
 from sni.export.ids import IdsExportError, IdsValidationError, export_ids
 from sni.export.skos import CatalogExportError, catalog_json, catalog_ttl
 from sni.knowledge.store import DEFAULT_KNOWLEDGE_DIR, KnowledgeBase, load_knowledge
@@ -209,6 +211,55 @@ def create_app(
                 status_code=500, content={"error": str(exc), "disclaimer": DISCLAIMER}
             )
         return JSONResponse(content=result)
+
+    @app.post("/v1/export/bcf")
+    def export_bcf_endpoint(payload: CheckPayload, request: Request) -> Response:
+        """REQ-702: Projektdaten prüfen, fail-Ergebnisse als BCF 2.1 exportieren.
+
+        400 = ungültige Projektdaten, 500 = unladbare Regeln oder interne
+        Fehler. 200 = BCF-ZIP (``application/octet-stream`` als
+        Attachment) mit ``bcf.version`` plus je ``fail`` ein Topic;
+        ``pass``/``insufficient_data`` enthalten keine Topics. G6: Der
+        Disclaimer steht in jeder Topic-Description.
+        """
+        rules_dir: Path = request.app.state.rules_dir
+        try:
+            rules = load_rules(rules_dir)
+        except RuleLoadError as exc:
+            return JSONResponse(
+                status_code=500, content={"error": str(exc), "disclaimer": DISCLAIMER}
+            )
+        try:
+            result = check(rules, payload.project_data)
+        except CheckInputError as exc:
+            return JSONResponse(
+                status_code=400, content={"error": str(exc), "disclaimer": DISCLAIMER}
+            )
+        except CheckError as exc:
+            return JSONResponse(
+                status_code=500, content={"error": str(exc), "disclaimer": DISCLAIMER}
+            )
+        raw_checks: object = result["checks"]
+        if not isinstance(raw_checks, list):
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error": "Check-Ergebnis ohne checks-Liste (intern)",
+                    "disclaimer": DISCLAIMER,
+                },
+            )
+        entries = [entry for entry in raw_checks if isinstance(entry, dict)]
+        try:
+            data = bcf_bytes(entries, datetime.now(UTC), DISCLAIMER)
+        except BcfExportError as exc:
+            return JSONResponse(
+                status_code=500, content={"error": str(exc), "disclaimer": DISCLAIMER}
+            )
+        return Response(
+            content=data,
+            media_type="application/octet-stream",
+            headers={"Content-Disposition": 'attachment; filename="sni-checks.bcf"'},
+        )
 
     return app
 
