@@ -13,5 +13,8 @@ __pycache__/
 # Reports (regenerierbar durch make eval)
 reports/eval_*.json
 
+# Lokale Datenbanken (regenerierbar durch Import)
+data/catalog/*.db
+
 # Lizenzierte Normtexte – nie ins Repo (Guardrail G4)
 data/norms/
