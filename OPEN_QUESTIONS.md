@@ -22,8 +22,10 @@ Format pro Eintrag:
   konkrete Bedarf an I14Y-kompatiblen Imports auf Seiten des Datenkatalogs ist nicht
   bekannt. Nachträgliche Ergänzung ist möglich (Export ist additiv).
 - Blockiert: – (betrifft M7)
-- Status: offen
-- Antwort:
+- Status: beantwortet (Empfehlung A übernommen, 2026-11-23)
+- Antwort: M7 liefert in v1 nur Turtle/SKOS; I14Y-JSON-Bundle ist ein dokumentiertes
+  Follow-up, sobald der konkrete Import-Bedarf beim Datenkatalog-Projekt besteht.
+  Der Export ist additiv, die Nachrüstung kostet dann kein Datenmodell-Update.
 
 ## OQ-002: CatalogSnapshot-Format (M1-Import)
 - Kontext: 05_MILESTONES.md M1 (REQ-100/101), 03_ARCHITECTURE.md (data/catalog/),
@@ -38,5 +40,31 @@ Format pro Eintrag:
   Anpassung bleibt lokal in src/sni/catalog/snapshot.py). Abgleich mit dem
   Datenkatalog-Projekt; C, falls das Format verbindlich wird.
 - Blockiert: – (M1 läuft mit A weiter)
+- Status: beantwortet (Empfehlung A übernommen, 2026-11-23)
+- Antwort: Der Consumer-Seiten-Kontrakt `{"snapshot_id": "<string>", "concepts": [Concept …]}`
+  (Concepts gegen concept.schema.json validiert) bleibt in Kraft, bis das
+  Datenkatalog-Projekt sein Format definiert. Anpassung bleibt lokal in
+  src/sni/catalog/snapshot.py. Falls das Format verbindlich wird: zusätzlich
+  `catalog_snapshot.schema.json` in schemas/ (braucht ADR, Option C).
+
+## OQ-003: Format der realen Normdokumente und Extraktionsweg (M2/Ingest)
+- Kontext: 05_MILESTONES.md M2 (REQ-200), ADR-0003 ("vorgeschlagen", keine
+  lizenzierten Texte im Repo), src/sni/ingest/pipeline.py (synthetisches
+  document.json-Format unter data/norms/<norm-id>/)
+- Frage: In welchem Format liegen die echten SIA-Normdokumente vor (PDF?
+  strukturiert?), und wie werden sie in das document.json-Format
+  (Ziffern, Tabellen, Formeln, Concept-Zuordnung) überführt – regelbasiert,
+  LLM-gestützt oder beides?
+- Optionen: A) Regelbasierter Parser pro Dokumentformat (deterministisch,
+  aber format-spezifischer Aufwand)
+  B) LLM-gestützte Extraktion mit der Review Queue als Sicherheitsnetz
+  (Kandidaten = candidate, Mensch prüft Fundstelle und Aussageklasse)
+  C) Eigenes Eingabeformat definieren und eine externe Vorverarbeitungsstufe
+  (z. B. OCR/LLM) vorsehen
+- Empfehlung Agent: B – passt zur M2-Mission "Ingest mit Review": die LLM
+  erzeugt Kandidaten mit review_status="candidate" (G3), der Mensch verifiziert
+  Fundstelle und Aussageklasse vor der Freigabe. Guardrail G4 bleibt gewahrt:
+  lizenzierte Texte wandern nicht ins Repo, Logs oder Fixtures.
+- Blockiert: – (M2 läuft mit synthetischem Platzhalter-Format weiter)
 - Status: offen
 - Antwort:
