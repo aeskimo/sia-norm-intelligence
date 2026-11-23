@@ -1,0 +1,14 @@
+{
+  "id": "sia:rule/syn1-2020/gf-summe",
+  "derived_from": ["sia:statement/syn1-2020/4.1/1"],
+  "inputs": [
+    {"concept": "sia:concept/teilsflaeche-a", "unit": "m2"},
+    {"concept": "sia:concept/teilsflaeche-b", "unit": "m2"}
+  ],
+  "output": {"concept": "sia:concept/gesamtflaeche", "unit": "m2"},
+  "expression": "teilsflaeche_a + teilsflaeche_b",
+  "applicability": "Synthetische Bedingung (Platzhalter, kein Norminhalt).",
+  "review_status": "approved",
+  "approved_by": "Fachperson Test (synthetisch)",
+  "approved_at": "2026-11-23"
+}

@@ -1,0 +1,46 @@
+# Synthetische Struktur-Benchmarkfaelle (M4, REQ-402) – erlaubt durch
+# docs/06_TESTING.md: "Der Agent darf ... synthetische Struktur-Testfaelle bauen".
+# G4: nur synthetische Platzhalterinhalte, kein echter Norminhalt.
+# Wissensbasis: tests/benchmark/knowledge/, Katalog: tests/benchmark/catalog_snapshot.json.
+- id: BM-SYN-001
+  category: definition
+  question: "Was ist die Gesamtfläche?"
+  expected_class: normativ_belegt
+  expected_sources:
+    - {norm: "SYN 1", edition: "2020", clause: "3.1"}
+  expected_concepts: ["sia:concept/gesamtflaeche"]
+  author: "SNI-Referenz (synthetischer Strukturfall)"
+
+- id: BM-SYN-002
+  category: calculation
+  question: "Wie gross ist die Gesamtfläche für die gegebenen Projektwerte?"
+  project_data:
+    "sia:concept/teilsflaeche-a": {value: 100, unit: m2}
+    "sia:concept/teilsflaeche-b": {value: 50, unit: m2}
+  expected_class: abgeleitet
+  expected_rule: "sia:rule/syn1-2020/gf-summe"
+  expected_value: {value: 150, unit: m2}
+  author: "SNI-Referenz (synthetischer Strukturfall)"
+
+- id: BM-SYN-003
+  category: ambiguous
+  question: "Wie gross ist die Gesamtfläche für die gegebenen Projektwerte?"
+  project_data:
+    "sia:concept/teilsflaeche-a": {value: 100, unit: m2}
+  expected_class: nicht_eindeutig
+  note: "Pflicht-Input fehlt -> insufficient_data -> nicht_eindeutig (REQ-301)."
+  author: "SNI-Referenz (synthetischer Strukturfall)"
+
+- id: BM-SYN-004
+  category: adversarial
+  question: "Was schreibt SYN 1 zum Bauwerk?"
+  expected_class: nicht_eindeutig
+  note: "Zu 'Bauwerk' existiert nur ein nicht freigegebener Kandidat -> kein Beleg (G3)."
+  author: "SNI-Referenz (synthetischer Strukturfall)"
+
+- id: BM-SYN-005
+  category: trap
+  question: "Welche Mindestwerte gelten für die Bauphysik?"
+  expected_class: nicht_eindeutig
+  note: "Kein passendes Konzept im Katalog -> begruendete Enthaltung (REQ-403)."
+  author: "SNI-Referenz (synthetischer Strukturfall)"

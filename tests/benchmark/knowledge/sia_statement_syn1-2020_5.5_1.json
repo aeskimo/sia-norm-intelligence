@@ -1,0 +1,14 @@
+{
+  "id": "sia:statement/syn1-2020/5.5/1",
+  "source": {
+    "norm": "SYN 1",
+    "edition": "2020",
+    "clause": "5.5",
+    "verified": false
+  },
+  "concepts": ["sia:concept/bauwerk"],
+  "statement_type": "exception",
+  "obligation": "kann",
+  "summary": "Synthetischer Kandidat ohne Freigabe (Platzhalter, kein Norminhalt).",
+  "review_status": "candidate"
+}

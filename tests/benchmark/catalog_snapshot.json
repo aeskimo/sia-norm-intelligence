@@ -1,0 +1,41 @@
+{
+  "snapshot_id": "sia:catalog/benchmark@1.0.0",
+  "concepts": [
+    {
+      "id": "sia:concept/gesamtflaeche",
+      "name": {"de": "Gesamtfläche"},
+      "definition": {"de": "Synthetischer Testbegriff (Platzhalter, kein Norminhalt)."},
+      "catalog_snapshot": "sia:catalog/benchmark@1.0.0"
+    },
+    {
+      "id": "sia:concept/teilsflaeche-a",
+      "name": {"de": "Teilsfläche A"},
+      "definition": {"de": "Synthetischer Testbegriff (Platzhalter, kein Norminhalt)."},
+      "catalog_snapshot": "sia:catalog/benchmark@1.0.0"
+    },
+    {
+      "id": "sia:concept/teilsflaeche-b",
+      "name": {"de": "Teilsfläche B"},
+      "definition": {"de": "Synthetischer Testbegriff (Platzhalter, kein Norminhalt)."},
+      "catalog_snapshot": "sia:catalog/benchmark@1.0.0"
+    },
+    {
+      "id": "sia:concept/bauwerk",
+      "name": {"de": "Bauwerk"},
+      "definition": {"de": "Synthetischer Testbegriff (Platzhalter, kein Norminhalt)."},
+      "catalog_snapshot": "sia:catalog/benchmark@1.0.0"
+    },
+    {
+      "id": "sia:concept/geschossflaeche",
+      "name": {"de": "Geschossfläche"},
+      "definition": {"de": "Synthetischer Testbegriff (Platzhalter, kein Norminhalt)."},
+      "catalog_snapshot": "sia:catalog/benchmark@1.0.0"
+    },
+    {
+      "id": "sia:concept/nutzflaeche",
+      "name": {"de": "Nutzfläche"},
+      "definition": {"de": "Synthetischer Testbegriff (Platzhalter, kein Norminhalt)."},
+      "catalog_snapshot": "sia:catalog/benchmark@1.0.0"
+    }
+  ]
+}
