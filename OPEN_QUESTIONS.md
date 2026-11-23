@@ -66,8 +66,21 @@ Format pro Eintrag:
   Fundstelle und Aussageklasse vor der Freigabe. Guardrail G4 bleibt gewahrt:
   lizenzierte Texte wandern nicht ins Repo, Logs oder Fixtures.
 - Blockiert: – (M2 läuft mit synthetischem Platzhalter-Format weiter)
-- Status: offen
-- Antwort:
+- Status: beantwortet (User-Input 2026-11-23; Design als ADR-0006 "vorgeschlagen", Umsetzung in M8)
+- Antwort: Fakten (User, 2026-11-23): echte SIA-Normen liegen als
+  **PDF (Print-Ausgabe)** vor und sind **nur über ein Online-Portal (Login)**
+  verfügbar; die LLM-Freigabe nach ADR-0003 ist noch "vorgeschlagen"; ein
+  Pilot-Dokument steht bereit. Entscheidung: Option B, gestaffelt –
+  (1) **manueller Download** der PDFs vom Portal in den lokalen Mount
+  `data/norms/<norm-id>/` (Portalcodedaten bleiben ausserhalb des Tools;
+  G4: PDFs nie ins Repo – `data/norms/` ist gitignored);
+  (2) **deterministische, offline PDF-Extraktion** (Text + Ziffern-Skelett)
+  in einen document.json-Entwurf; (3) **Fachliche Vervollständigung**
+  (summary, concepts, statement_type, obligation): vorerst halbnah (Mensch),
+  nach Freigabe LLM-gestützt via `SNI_LLM_ENDPOINT` (ADR-0003). Der Output
+  läuft immer durch die bestehende Ingest-Pipeline (G3: nur candidate,
+  Mensch verifiziert Fundstelle und Aussageklasse). Details und die neue
+  Laufzeit-Abhängigkeit (PDF-Lesebibliothek, AGENTS.md §5): ADR-0006.
 
 ## OQ-004: Vertrag für die Antwort von POST /v1/check (M5)
 - Kontext: 05_MILESTONES.md M5 (REQ-501), 04_DATA_MODEL.md (Kernobjekte-Tabelle),
