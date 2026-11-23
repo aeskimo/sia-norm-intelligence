@@ -22,5 +22,8 @@ data/review_queue/*.json
 # Regeln (lokaler Mount, wie data/norms/)
 data/rules/*.json
 
+# Freigegebene semantische Objekte (lokaler Mount, Freigabe durch Fachperson)
+data/extracted/*.json
+
 # Lizenzierte Normtexte – nie ins Repo (Guardrail G4)
 data/norms/
