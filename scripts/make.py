@@ -1,4 +1,4 @@
-"""Plattformuebergreifendes Make-Aequivalent: setup | check | eval | run (REQ-000).
+"""Plattformuebergreifendes Make-Aequivalent: setup | check | eval | run | ingest (REQ-000/REQ-200).
 
 Wird aufgerufen von:
 - Makefile (Linux/macOS/CI)
@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 VENV_DIR = ROOT / ".venv"
 MIN_VERSION = (3, 12)
 PREFERRED_VERSIONS = ("3.12", "3.13", "3.14")
-TARGETS = ("setup", "check", "eval", "run")
+TARGETS = ("setup", "check", "eval", "run", "ingest")
 PROBE_VERSION = "import sys; raise SystemExit(0 if sys.version_info >= {min_version} else 1)"
 PROBE_EXECUTABLE = "import sys; print(sys.executable)"
 
@@ -121,6 +121,15 @@ def cmd_eval() -> int:
     return 0
 
 
+def cmd_ingest(norm_id: str | None) -> int:
+    py = str(ensure_venv())
+    if not norm_id:
+        print("make: ingest braucht eine Norm-ID: make ingest NORM=<norm-id>")
+        return 2
+    _run([py, "-m", "sni.ingest", norm_id])
+    return 0
+
+
 def cmd_run() -> int:
     py = str(ensure_venv())
     port = os.environ.get("PORT", "8000")
@@ -139,13 +148,33 @@ HANDLERS: dict[str, Callable[[], int]] = {
 }
 
 
+def _parse_norm_arg(arg: str) -> str | None:
+    """Akzeptiert '<norm-id>' oder 'NORM=<norm-id>' (make.cmd reicht %* durch)."""
+    if arg.startswith("NORM="):
+        return arg.removeprefix("NORM=") or None
+    return arg
+
+
 def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
-    if len(args) != 1 or args[0] not in TARGETS:
-        print(f"Verwendung: make <{' | '.join(TARGETS)}>")
+    if not args or args[0] not in TARGETS:
+        print(f"Verwendung: make <{' | '.join(TARGETS)}> [ingest: NORM=<norm-id>]")
+        return 2
+    target = args[0]
+    norm_id: str | None = None
+    if target == "ingest":
+        if len(args) > 2:
+            print("Verwendung: make ingest NORM=<norm-id>")
+            return 2
+        if len(args) == 2:
+            norm_id = _parse_norm_arg(args[1])
+    elif len(args) != 1:
+        print(f"Verwendung: make {target}")
         return 2
     try:
-        return HANDLERS[args[0]]()
+        if target == "ingest":
+            return cmd_ingest(norm_id)
+        return HANDLERS[target]()
     except MakeError as exc:
         print(f"make: {exc}", file=sys.stderr)
         return 1

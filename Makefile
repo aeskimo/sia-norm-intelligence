@@ -10,7 +10,10 @@ endif
 
 .DEFAULT_GOAL := check
 
-.PHONY: setup check eval run
+.PHONY: setup check eval run ingest
+
+ingest:
+	$(SYSTEM_PY) scripts/make.py ingest $(NORM)
 
 setup:
 	$(SYSTEM_PY) scripts/make.py setup
