@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from sni.catalog.store import ConceptStore
+from sni.export.ids import IdsExportError, IdsValidationError, export_ids
 from sni.export.skos import CatalogExportError, catalog_json, catalog_ttl
 from sni.knowledge.store import DEFAULT_KNOWLEDGE_DIR, KnowledgeBase, load_knowledge
 from sni.rules.engine import DEFAULT_RULES_DIR, RuleLoadError, load_rules
@@ -39,6 +40,12 @@ class CheckPayload(BaseModel):
     """Request-Modell für POST /v1/check (REQ-501)."""
 
     project_data: dict[str, dict[str, object]] | None = None
+
+
+class IdsPayload(BaseModel):
+    """Request-Modell für POST /v1/export/ids (REQ-701)."""
+
+    rule_ids: list[str] | None = None
 
 
 def create_app(
@@ -169,6 +176,39 @@ def create_app(
                 "disclaimer": DISCLAIMER,
             },
         )
+
+    @app.post("/v1/export/ids")
+    def export_ids_endpoint(payload: IdsPayload, request: Request) -> JSONResponse:
+        """REQ-701: Regeln als IDS 1.0-Spezifikation, sonst GapReport (ADR-0005).
+
+        400 = unbekannte oder nicht-approved Regel (G3), 500 = unladbare
+        Regeln oder nicht schemakonformer Export. ``rule_ids`` leer =
+        alle approved Regeln.
+        """
+        rules_dir: Path = request.app.state.rules_dir
+        try:
+            rules = load_rules(rules_dir)
+        except RuleLoadError as exc:
+            return JSONResponse(
+                status_code=500, content={"error": str(exc), "disclaimer": DISCLAIMER}
+            )
+        store: ConceptStore = request.app.state.store
+        concept_by_id: dict[str, dict[str, object]] = {}
+        for concept_id in store.concept_ids():
+            concept = store.get_concept(concept_id)
+            if concept is not None:
+                concept_by_id[concept_id] = concept
+        try:
+            result = export_ids(rules, concept_by_id, payload.rule_ids, DISCLAIMER)
+        except IdsExportError as exc:
+            return JSONResponse(
+                status_code=400, content={"error": str(exc), "disclaimer": DISCLAIMER}
+            )
+        except IdsValidationError as exc:
+            return JSONResponse(
+                status_code=500, content={"error": str(exc), "disclaimer": DISCLAIMER}
+            )
+        return JSONResponse(content=result)
 
     return app
 
