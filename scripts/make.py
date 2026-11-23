@@ -10,13 +10,11 @@ Interpret wird bei Bedarf automatisch angelegt (ADR-0002: Python >= 3.12).
 
 from __future__ import annotations
 
-import json
 import os
 import shutil
 import subprocess
 import sys
 from collections.abc import Callable
-from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -102,23 +100,10 @@ def cmd_check() -> int:
 
 
 def cmd_eval() -> int:
-    ensure_venv()
-    case_files = sorted(p.name for p in (ROOT / "tests" / "benchmark").glob("*.yaml"))
-    report = {
-        "date": date.today().isoformat(),
-        "case_files": case_files,
-        "cases": 0,
-        "executed": 0,
-        "critical_failures": 0,
-        "status": "ok",
-        "note": "M0: Runner-Geruest; Auswertung echter Benchmark-Faelle ab M2 (docs/06_TESTING.md)",
-    }
-    reports = ROOT / "reports"
-    reports.mkdir(exist_ok=True)
-    out = reports / f"eval_{date.today().isoformat()}.json"
-    out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"[eval] Report geschrieben: {out.relative_to(ROOT)}")
-    return 0
+    """REQ-402: Benchmark -> reports/eval_<datum>.json; exit != 0 bei kritischen Faelen."""
+    py = str(ensure_venv())
+    proc = subprocess.run([py, "-m", "sni.service.benchmark"], cwd=ROOT)
+    return proc.returncode
 
 
 def cmd_ingest(norm_id: str | None) -> int:
