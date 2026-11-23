@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+# Tooling
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+
+# Reports (regenerierbar durch make eval)
+reports/eval_*.json
+
+# Lizenzierte Normtexte – nie ins Repo (Guardrail G4)
+data/norms/
