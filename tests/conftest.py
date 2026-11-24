@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import base64
+import io
 import json
+import zipfile
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import cast
@@ -12,6 +15,14 @@ import pytest
 from sni.catalog.snapshot import load_snapshot
 from sni.catalog.store import ConceptStore
 from sni.rules.engine import InputValue
+from sni.shop.decrypt import (
+    LEGACY_STATIC_IV,
+    LEGACY_STATIC_KEY,
+    des_cbc_encrypt,
+    wrap_srd_value_for_testing,
+)
+from sni.shop.models import DISCARD, DocumentResult, LicenseSink, LoginResult, LoginStatus
+from sni.shop.soap import SiaSoapClient
 
 SNAPSHOT_ID = "sia:catalog/test@1.0.0"
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -289,3 +300,138 @@ def clauses_of(draft: dict[str, object]) -> list[dict[str, object]]:
 def clause_text(clause: dict[str, object]) -> str:
     """Extrahierter Ziffern-Text einer Ziffer (mit Typ, für mypy --strict)."""
     return cast(str, clause["text"])
+
+
+# ---------------------------------------------------------------------------
+# SIA-Shop-Fakes (REQ-801/803): synthetische .mro/.srd + Client-Double (G4)
+# ---------------------------------------------------------------------------
+
+SHOP_NS = "http://www.redMSoftware.ch/Secure_Webservice"
+SRD_KEY = "k1234567"  # 8 ASCII-Bytes (Java: char[] → individueller DES-Schlüssel)
+SRD_IV = "i1234567"
+
+LICENSE_XML = f"""<?xml version="1.0"?>
+<dsSecureReaderLizenz>
+  <Konfiguration>
+    <SRD_KEY>{wrap_srd_value_for_testing(SRD_KEY)}</SRD_KEY>
+    <SRD_IV>{wrap_srd_value_for_testing(SRD_IV)}</SRD_IV>
+  </Konfiguration>
+  <Produkt>
+    <ID>prod-101</ID>
+    <Produktnummer>SIA 101</Produktnummer>
+    <Bezeichnung>Testnorm</Bezeichnung>
+    <Dateiname>101_2020_dSIA.srd</Dateiname>
+    <Recht_View>1</Recht_View>
+  </Produkt>
+  <Produkt>
+    <ID>prod-102</ID>
+    <Produktnummer>SIA 102</Produktnummer>
+    <Bezeichnung>Nur-Metadaten-Norm</Bezeichnung>
+    <Dateiname>102_2020_dSIA.srd</Dateiname>
+    <Recht_View>0</Recht_View>
+  </Produkt>
+  <Produkt>
+    <Bezeichnung>Ohne ID</Bezeichnung>
+  </Produkt>
+</dsSecureReaderLizenz>
+"""
+
+
+def _zip_one(name: str, data: bytes | str) -> bytes:
+    payload = data.encode("utf-8") if isinstance(data, str) else data
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr(name, payload)
+    return buffer.getvalue()
+
+
+def make_mro(license_xml: str) -> bytes:
+    """Synthetische .mro: ZIP(DES_static(Lizenz-XML)) (G4)."""
+    encrypted = des_cbc_encrypt(license_xml.encode("utf-8"), LEGACY_STATIC_KEY, LEGACY_STATIC_IV)
+    return _zip_one("lizenz.xml", encrypted)
+
+
+def make_srd(product_id: str, document: bytes, crypted_b64: str | None = None) -> bytes:
+    """Synthetische .srd: ZIP(XML mit Base64(DES_individuell(Dokument))) (G4)."""
+    if crypted_b64 is None:
+        crypted_b64 = base64.b64encode(des_cbc_encrypt(document, SRD_KEY, SRD_IV)).decode("ascii")
+    xml = (
+        '<?xml version="1.0"?>'
+        "<SRDDokument>"
+        f"<ID>{product_id}</ID>"
+        f"<Orig_Dateiname>{product_id}.srd</Orig_Dateiname>"
+        f"<Orig_Dokument_Crypted>{crypted_b64}</Orig_Dokument_Crypted>"
+        "</SRDDokument>"
+    )
+    return _zip_one("dokument.xml", xml)
+
+
+def login_result_ok() -> LoginResult:
+    return LoginResult(True, 200, LoginStatus.SUCCESS, "OK", None, 123, 5, None, 1)
+
+
+def login_result_failure(status: LoginStatus, message: str) -> LoginResult:
+    return LoginResult(True, 200, status, status.server_code, message, 0, 5, None, 1)
+
+
+def document_result_ok(filename: str) -> DocumentResult:
+    return DocumentResult(True, "OK", None, filename, 999, 5, None, 1)
+
+
+def document_result_failure(
+    server_code: str | None,
+    message: str | None,
+    filename: str | None,
+    diagnostic: str | None,
+) -> DocumentResult:
+    return DocumentResult(False, server_code, message, filename, 0, 5, diagnostic, 1)
+
+
+class FakeSoapClient(SiaSoapClient):
+    """Client-Double: Testkonstruktor + Override der Netzwerk-Methoden."""
+
+    def __init__(
+        self,
+        login_result: LoginResult,
+        license_bytes: bytes | None = None,
+        document_result: DocumentResult | None = None,
+        srd_bytes: bytes | None = None,
+    ) -> None:
+        super().__init__(
+            "http://127.0.0.1/echo",
+            "http://127.0.0.1/lizenz",
+            "http://127.0.0.1/dokument",
+            SHOP_NS,
+            "Test",
+            1.0,
+            1.0,
+        )
+        self._fake_login_result = login_result
+        self._fake_license_bytes = license_bytes
+        self._fake_document_result = document_result
+        self._fake_srd_bytes = srd_bytes
+
+    def login(
+        self,
+        customer_number_or_username: str,
+        password: str,
+        device_id: str,
+        sink: LicenseSink = DISCARD,
+    ) -> LoginResult:
+        if self._fake_login_result.is_success and self._fake_license_bytes is not None:
+            sink.accept(self._fake_license_bytes)
+        return self._fake_login_result
+
+    def get_document(
+        self,
+        produkt_id: str,
+        customer_number_or_username: str,
+        password: str,
+        device_id: str,
+    ) -> DocumentResult:
+        result = self._fake_document_result
+        if result is None:
+            raise AssertionError("get_document wurde unerwartet aufgerufen")
+        if result.success and self._fake_srd_bytes is not None:
+            self._last_document_base64 = base64.b64encode(self._fake_srd_bytes).decode("ascii")
+        return result
