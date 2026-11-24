@@ -118,8 +118,8 @@ def read_single_zip_entry(data: bytes) -> tuple[str, bytes]:
         return names[0], archive.read(names[0])
 
 
-def _parse_xml(xml_bytes: bytes, what: str) -> ET.Element:
-    """XML-Parseein mit DOCTYPE-Guard (Java: ``disallow-doctype-decl=true``)."""
+def parse_guarded_xml(xml_bytes: bytes, what: str) -> ET.Element:
+    """XML-Parser mit DOCTYPE-Guard (Java: ``disallow-doctype-decl=true``)."""
     try:
         text = xml_bytes.decode("utf-8")
     except UnicodeDecodeError as exc:
@@ -152,7 +152,7 @@ def decrypt_mro(mro_bytes: bytes) -> str:
     """
     _name, encrypted = read_single_zip_entry(mro_bytes)
     xml_bytes = des_cbc_decrypt(encrypted, LEGACY_STATIC_KEY, LEGACY_STATIC_IV)
-    _parse_xml(xml_bytes, ".mro")  # Validierung: UTF-8, DOCTYPE-Guard, wohlgeformt
+    parse_guarded_xml(xml_bytes, ".mro")  # Validierung: UTF-8, DOCTYPE-Guard, wohlgeformt
     return xml_bytes.decode("utf-8")
 
 
@@ -161,7 +161,7 @@ def extract_individual_key_and_iv(license_xml: str) -> tuple[str, str]:
 
     Java: ``MroLicenseDecryptor.extractIndividualKeyAndIv``.
     """
-    root = _parse_xml(license_xml.encode("utf-8"), "Lizenz-XML")
+    root = parse_guarded_xml(license_xml.encode("utf-8"), "Lizenz-XML")
     wrapped_key = _first_text_local(root, "SRD_KEY")
     wrapped_iv = _first_text_local(root, "SRD_IV")
     if wrapped_key is None or wrapped_iv is None:
@@ -183,7 +183,7 @@ class SrdMetadata:
 def srd_read_metadata(srd_bytes: bytes) -> SrdMetadata:
     """Liest die Metadaten aus einer .srd (Java: ``SrdDocumentDecryptor.readMetadata``)."""
     _name, xml_bytes = read_single_zip_entry(srd_bytes)
-    root = _parse_xml(xml_bytes, ".srd")
+    root = parse_guarded_xml(xml_bytes, ".srd")
     crypted = _first_text_local(root, "Orig_Dokument_Crypted") or ""
     return SrdMetadata(
         id=_first_text_local(root, "ID") or "",
@@ -201,7 +201,7 @@ def srd_decrypt_document(srd_bytes: bytes, key: str, iv: str) -> bytes:
     DES mit individuellem Schlüssel/IV).
     """
     _name, xml_bytes = read_single_zip_entry(srd_bytes)
-    root = _parse_xml(xml_bytes, ".srd")
+    root = parse_guarded_xml(xml_bytes, ".srd")
     crypted_b64 = _first_text_local(root, "Orig_Dokument_Crypted")
     if crypted_b64 is None:
         raise SiaShopError(".srd: Element 'Orig_Dokument_Crypted' nicht gefunden")
