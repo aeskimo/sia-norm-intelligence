@@ -32,7 +32,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: System dependencies (Linux: WebKit2GTK, Xvfb)
+      - name: "System dependencies (Linux: WebKit2GTK, Xvfb)"
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
