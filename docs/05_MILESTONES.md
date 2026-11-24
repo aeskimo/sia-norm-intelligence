@@ -48,3 +48,22 @@ Jeder Milestone ist erst fertig, wenn alle Kriterien als Test existieren und gr�
 - REQ-801: Extraktion ist atomar: alle Fehler werden gesammelt als Bericht geliefert; bei Fehlern wird keine Datei geschrieben (KBOB-Muster)
 - REQ-802: G4: Fehlerbericht und CLI-Ausgabe enthalten nur Norm-ID, Ziffern, Feldnamen und Zählungen – nie Normtexte
 - REQ-803: Given ein extrahierter Entwurf When die Fachperson die `document.json` vervollständigt (Stufe 2, manuell) Then erzeugt die bestehende Ingest-Pipeline (M2) unverändert Kandidaten mit Fundstelle
+## M8 – Consumer-App (Web-UI auf dem SNI-Kern; siehe 09_CONSUMER_APP.md)
+- REQ-800: `python -m sni.app` startet die UI als Fenster (pywebview), Browser (`--browser`) und Headless (`--headless`); UI und API same-origin auf `127.0.0.1` (kein CORS)
+- REQ-801: SIA-Login (SOAP-Port: ECHO, `getLizenzDatei`, `getDocument_Byte`; Provider SIA/VSS/PHGR/SWKI; stabile Device-ID) liefert den Katalog inkl. Status; Protokoll-Fehlercodes werden 1:1 weitergegeben
+- REQ-802: Zugangsdaten und Schlüssel liegen im cross-platform Keyring (Service `ch.sia.normenassistent`, Accounts `sia-login`/`gibb-api-key`/`state-key`); "Merken" ist opt-in und beim Start wird automatisch eingetragen; Keyring-Migration ist ein expliziter 3-OS-Test (macOS: Java-Einträge unter gleichem Service/Account lesbar; Windows/Linux: keine Java-Einträge — Java schrieb nur auf macOS)
+- REQ-803: Dokument-Download (`.srd`→DES→PDF) landet im verschlüsselten Session-Cache; Registry mit Statusfluss `CACHED→INDEXING→FULLTEXT_READY/HYBRID_READY/ERROR`; Entfernen löscht Cache und Index
+- REQ-804: Analyse-Pipeline (PDF-Extraktion via Fixture-Gate: **pypdfium2 und pdfminer.six** laufen gegen dieselbe Java-Baseline, das Gate entscheidet welche bleibt; PyMuPDF ausgeschlossen, AGPL; invertierter Volltext-Index, Vektorindex via Ollama `/api/embed` Batch 32, Chunk 600/60, Hybrid RRF k=60); verschlüsselte Index-Persistenz; Extraktionsqualität ≥ Java-Baseline (Ziffern-Erkennungs-Rate auf Fixtures)
+- REQ-805: RAG-QA mit `[Qn]`-Quellenblöcken, Zitat-Validierung, Aussageklassen und Abweisung zitatabweissloser Antworten; Streaming via SSE
+- REQ-806: Ollama-Modellverwaltung (List/Pull/Delete) mit Loopback-Zwang
+- REQ-807: gibb-Provider (HTTPS-only, Bearer aus Keyring, `/models` + `/chat/completions` SSE); der API-Key verlässt das Backend nie
+- REQ-808: Einstellungen und Arbeitssets persistent im User-Datenverzeichnis (`workspace.json`, atomar)
+- REQ-809: Review-Queue-API + UI: Kandidaten listen, Freigeben (menschlicher Akt, `approved_by`+`approved_at`, `source.verified=true`, Move nach `extracted/`), Ablehnen; nie automatisch (G3); `approved_by` = konfigurierte Freigabeperson (Settings), wenn nicht gesetzt einmalige Frage beim ersten Freigeben (OS-Username allein gilt als schwacher Audit-Eintrag), optionaler Override im Dialog
+- REQ-810: Semantik-Export (deterministischer Port, G1/G5) erzeugt `document.json` und triggert den Ingest in-process → Kandidaten + Gaps
+- REQ-811: Projektdaten-UI: CSV/IFC-Upload → `POST /v1/projectdata` → `POST /v1/check` → BCF-/IDS-Export
+- REQ-812: Norm-Intelligence-UI: Frage → `POST /v1/answer` mit Aussageklasse-Chip, Claims, Fundstellen und Disclaimer
+- REQ-813: CI auf ubuntu/macos/windows (jeweils `make check`) + Installer via PyInstaller (EXE / .app / AppImage)
+- REQ-814: Design-Baseline: SIA-Design-Tokens (CSS), WCAG 2.1 AA (Kontrast ≥ 4.5:1, Mindest-Font 12 px), Dark Mode via `prefers-color-scheme`, Fenster-Fit 1200×800
+- REQ-815: Migration des Java-Stands beim ersten Start: `workspace.state` (SIASST1) → `workspace.json`, `*.siaidx` (SIAIDX01) → `.sniidx` (Byte-kompatibler Importer); Keychain-Einträge: macOS lesbar unter gleichem Service/Account (Test), Windows/Linux ohne Java-Einträge (dokumentierte Abwesenheit)
+- REQ-816: App-API-Sicherheit (nur `app_mode`): zufälliger freier Port pro Start (Fenster-/Browser-Modus), Session-Token (Launcher → UI, Pflicht auf `/v1/*`), `Host`-Header muss loopback sein, nicht-same-origin `Origin` wird abgelehnt (Schutz gegen CSRF/DNS-Rebinding, G4)
+- REQ-817: Packaging-Smoke in M8.1: minimale App (Hello Window) wird in der CI auf ubuntu/macos/windows gebaut und gestartet (PyInstaller + pywebview; WebView2/WebKitGTK); echte Installer inkl. Code-Signing/Notarization (OQ-014) in M8.6

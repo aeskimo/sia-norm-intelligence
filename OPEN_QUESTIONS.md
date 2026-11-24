@@ -355,3 +355,110 @@ Format pro Eintrag:
   betroffen, Stufe 2 ist startklar)
 - Status: offen
 - Antwort:
+## OQ-009: App-Shell für M8 – pywebview, Tauri oder Browser?
+- Kontext: docs/09_CONSUMER_APP.md §4, ADR-0007
+- Frage: Welches Fenster-System bekommt die Consumer-App?
+- Optionen: A) pywebview (System-Webview, 1 pip-Paket) B) Tauri v2
+  (Rust, poliertere Shell) C) reiner Browser-Tab (Launcher öffnet URL)
+- Empfehlung Agent: A – passt zum Python-Stack ohne 2. Toolchain; B
+  bleibt Eskalations-Option, wenn das Fenster-Feeling nicht reicht;
+  C bleibt ohnehin als `--browser`-Modus.
+- Blockiert: REQ-800
+- Status: beantwortet (User-Entscheid, 2026-11-24)
+- Antwort: A — pywebview. Einwand: kein Tray-Icon, keine
+  Multi-Window nötig für ein Normen-Tool. Die UI ist shell-agnostisch
+  (statische Dateien, same-origin); Tauri bleibt Eskalations-Option
+  ohne UI-Rework (ADR-0007).
+
+## OQ-010: PDF-Extraktion – pdfminer.six vs. Poppler (pdftotext)
+- Kontext: docs/09_CONSUMER_APP.md §4/§12, REQ-804, Java-Baseline
+  `PdftotextExtractor` (pdftotext -layout)
+- Frage: Reicht die Textqualität von pdfminer.six (pure Python) für
+  die Ziffern-/Tabelle-Erkennung des Semantik-Exports, oder bleibt
+  Poppler als System-Binary nötig?
+- Optionen: A) pdfminer.six mit Fixture-Qualitätsgate (Falls
+  Poppler-Option) B) Poppler als fixe System-Dependency
+- Empfehlung Agent: A – Consumer-Packaging ohne System-Binary hat
+  Vorrang; das Gate mit synthetischer Norm-PDF-Fixture (Ziffern-
+  Erkennungs-Rate vs. Java-Baseline) entscheidet objektiv.
+- Blockiert: REQ-804, REQ-810
+- Status: beantwortet (User-Entscheid, 2026-11-24)
+- Antwort: A mit Gegenkandidat — **pypdfium2 und pdfminer.six**
+  laufen durch dasselbe Fixture-Gate (REQ-804); das Gate entscheidet,
+  welche Engine bleibt. pypdfium2: Binaries im Wheel (kein
+  System-Binary), deutlich schneller, extrahiert oft besser.
+  **PyMuPDF ausgeschlossen (AGPL-Lizenz).**
+
+## OQ-011: approved_by bei der Review-Freigabe in der UI
+- Kontext: ADR-0008, G3 (approved_by + approved_at Pflicht),
+  sni:settings (neues Feld)
+- Frage: Wer ist `approved_by` bei einem UI-Freigabe-Klick – der
+  lokale OS-User oder eine konfigurierte "Freigabeperson"?
+- Optionen: A) konfigurierter Name in /settings (Default: OS-User)
+  B) immer OS-User C) Freitext-Dialog bei jedem Freigabe-Klick
+- Empfehlung Agent: A – G3 verlangt eine benannte Fachperson;
+  Default OS-User macht den ersten Lauf sofort funktionsfähig.
+- Blockiert: REQ-809
+- Status: beantwortet (User-Entscheid, 2026-11-24)
+- Antwort: A + Override — konfigurierte Freigabeperson in /settings;
+  **wenn keine gesetzt ist, einmalige Frage beim ersten Freigeben**
+  (OS-Username wie „uprestle" gilt als schwacher Audit-Eintrag);
+  optionaler Override im Freigabe-Dialog (ADR-0008).
+
+## OQ-012: Persistenz der PDF-Bytes über Neustart hinaus?
+- Kontext: docs/09_CONSUMER_APP.md §9.2, Java-Policy
+  ("PDFs ausschliesslich im verschlüsselten Sitzungscache, keine
+  Persistenz"), Index ist persistent (verschlüsselt)
+- Frage: Darf/ soll die App die heruntergeladenen PDFs (lizenziert)
+  verschlüsselt über Neustarts behalten, um Re-Downloads zu sparen?
+- Optionen: A) session-only bleibt (heutige Lizenzposition)
+  B) persistiert verschlüsselt im User-Datenverzeichnis
+- Empfehlung Agent: A, bis die SIA die Position bestätigt –
+  Lizenzchange nie einseitig; B ist nachträglich additiv möglich.
+- Blockiert: REQ-803 (nur für das Persistenz-Feature)
+- Status: beantwortet (User-Entscheid, 2026-11-24)
+- Antwort: A — session-only bleibt **endgültig**. Die Lizenz-Linie
+  wird genau so weitergeführt wie bis jetzt; **keine Nachfrage bei
+  der SIA** — der User ist Mitglied der Arbeitsgruppe
+  SIA-Datenkatalog und entscheidet entsprechend (OQ-013).
+
+
+## OQ-013: Lizenz-Fragen an die SIA — PDF-Persistenz UND verschlüsselter Index
+- Kontext: docs/09_CONSUMER_APP.md §9.5, ADR-0009, OQ-012
+- Frage: (1) Darf die Consumer-App die heruntergeladenen, lizenzierten
+  PDFs verschlüsselt über Neustarts behalten? (2) Ist der heutige
+  persistent, verschlüsselte Volltext-/Vektorindex (enthält
+  Seitentext = faktisch Norminhalt, nur verschlüsselt) in dieser Form
+  zulässig? Beide Fragen betreffen dieselbe Linie („lizenzierte
+  Inhalte auf der Platte") und werden gemeinsam gestellt.
+- Optionen: A) beide ja → PDF-Persistenz wird Feature, Index bleibt
+  B) PDFs ja, Index nein → Index wird session-only (betrifft dann
+  auch die Java-Migration) C) beide nein → der heutige Index-Stand
+  ist zu viel
+- Empfehlung Agent: zuerst fragen, dann bauen. Der Index steht heute
+  schon so (Java-Ist-Zustand) und wird der SIA als solcher
+  vorgestellt, nicht als geklärt unterstellt.
+- Blockiert: REQ-803 (Persistenz-Feature), REQ-815 (nur Outcome C)
+- Status: beantwortet (User-Entscheid, 2026-11-24)
+- Antwort: **Keine Anfrage an die SIA** — der User ist Mitglied der
+  Arbeitsgruppe SIA-Datenkatalog und entscheidet: **Status-Quo
+  bleibt** (PDFs session-only, verschlüsselter Index persistent).
+  Damit erledigt beides als Option B (PDFs nein, Index ja); das
+  Produkt ändert nichts an der bisherigen Lizenz-Linie.
+
+## OQ-014: Code-Signing & Notarization für die M8-Installer
+- Kontext: docs/09_CONSUMER_APP.md §11, REQ-813, REQ-817
+- Frage: Welche Signaturen braucht das Produkt pro OS — macOS
+  (Apple Developer ID + Notarization, für Distribution faktisch
+  zwingend), Windows (OV/EV-Certificate, SmartScreen-Status), Linux
+  (AppImage ohne Signature, optional GPG)? Welche Zertifikate
+  existieren bzw. sollen beschafft werden?
+- Optionen: A) macOS signiert + notariert, Windows mit OV-Cert,
+  Linux ohne Signature B) zuerst unsigned intern, Signing nach
+  Zertifikats-Beschaffung
+- Empfehlung Agent: A, sofern die Zertifikate verfügbar sind;
+  unsigned lokale Builds funktionieren (Gatekeeper-/SmartScreen-
+  Hinweis) — für den ersten internen Kreis akzeptabel.
+- Blockiert: REQ-813 (M8.6)
+- Status: offen
+- Antwort: –
