@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 VENV_DIR = ROOT / ".venv"
 MIN_VERSION = (3, 12)
 PREFERRED_VERSIONS = ("3.12", "3.13", "3.14")
-TARGETS = ("setup", "check", "eval", "run", "ingest", "extract")
+TARGETS = ("setup", "check", "eval", "run", "ingest", "extract", "snapshot")
 PROBE_VERSION = "import sys; raise SystemExit(0 if sys.version_info >= {min_version} else 1)"
 PROBE_EXECUTABLE = "import sys; print(sys.executable)"
 
@@ -125,6 +125,15 @@ def cmd_extract(norm_id: str | None) -> int:
     return 0
 
 
+def cmd_snapshot(file_arg: str | None) -> int:
+    py = str(ensure_venv())
+    if not file_arg:
+        print("make: snapshot braucht eine Datei: make snapshot FILE=<snapshot.json>")
+        return 2
+    _run([py, "-m", "sni.catalog", "import", file_arg])
+    return 0
+
+
 def cmd_run() -> int:
     py = str(ensure_venv())
     port = os.environ.get("PORT", "8000")
@@ -150,6 +159,13 @@ def _parse_norm_arg(arg: str) -> str | None:
     return arg
 
 
+def _parse_file_arg(arg: str) -> str | None:
+    """Akzeptiert '<pfad>' oder 'FILE=<pfad>' (make.cmd reicht %* durch)."""
+    if arg.startswith("FILE="):
+        return arg.removeprefix("FILE=") or None
+    return arg
+
+
 def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
     if not args or args[0] not in TARGETS:
@@ -157,12 +173,19 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     target = args[0]
     norm_id: str | None = None
+    file_arg: str | None = None
     if target in ("ingest", "extract"):
         if len(args) > 2:
             print(f"Verwendung: make {target} NORM=<norm-id>")
             return 2
         if len(args) == 2:
             norm_id = _parse_norm_arg(args[1])
+    elif target == "snapshot":
+        if len(args) > 2:
+            print("Verwendung: make snapshot FILE=<snapshot.json>")
+            return 2
+        if len(args) == 2:
+            file_arg = _parse_file_arg(args[1])
     elif len(args) != 1:
         print(f"Verwendung: make {target}")
         return 2
@@ -171,6 +194,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_ingest(norm_id)
         if target == "extract":
             return cmd_extract(norm_id)
+        if target == "snapshot":
+            return cmd_snapshot(file_arg)
         return HANDLERS[target]()
     except MakeError as exc:
         print(f"make: {exc}", file=sys.stderr)

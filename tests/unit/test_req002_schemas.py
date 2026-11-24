@@ -14,6 +14,7 @@ EXPECTED = {
     "document_draft.schema.json",  # M8, ADR-0006
     "gap_report.schema.json",
     "norm_statement.schema.json",
+    "project_values.schema.json",
     "rule.schema.json",
     "source_reference.schema.json",
 }

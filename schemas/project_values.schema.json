@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sni:project_values",
+  "type": "object",
+  "required": ["format", "file", "values", "quantity_mapping", "disclaimer"],
+  "properties": {
+    "format": {"enum": ["csv", "ifc"]},
+    "file": {"type": "string", "minLength": 1},
+    "values": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["concept", "value", "unit", "provenance"],
+        "properties": {
+          "concept": {"type": "string", "minLength": 1},
+          "value": {"type": "number"},
+          "unit": {"type": "string", "minLength": 1},
+          "provenance": {
+            "type": "object",
+            "required": ["file", "locator"],
+            "properties": {
+              "file": {"type": "string", "minLength": 1},
+              "locator": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "quantity_mapping": {
+      "type": ["object", "null"],
+      "additionalProperties": {"type": "string"}
+    },
+    "disclaimer": {"type": "string", "minLength": 1}
+  }
+}

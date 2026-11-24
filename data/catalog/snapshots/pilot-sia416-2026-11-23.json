@@ -1,0 +1,41 @@
+{
+  "snapshot_id": "pilot-sia416-2026-11-23",
+  "concepts": [
+    {
+      "id": "sia:concept/feuerwiderstandsfaehigkeit",
+      "name": {"de": "Feuerwiderstandsfähigkeit"},
+      "definition": {"de": "Fähigkeit eines Bauteils, während eines Feuers die geforderten Funktionen (Tragfähigkeit, Abdichtung, Wärmeschutz) über eine bestimmte Dauer zu erfüllen."},
+      "catalog_snapshot": "pilot-sia416-2026-11-23"
+    },
+    {
+      "id": "sia:concept/feuerwiderstandsklasse",
+      "name": {"de": "Feuerwiderstandsklasse"},
+      "definition": {"de": "Klassifikation der Feuerwiderstandsfähigkeit eines Bauteils, angegeben durch Dauer und Funktion (z. B. REI 60)."},
+      "catalog_snapshot": "pilot-sia416-2026-11-23"
+    },
+    {
+      "id": "sia:concept/feuerwiderstandsdauer",
+      "name": {"de": "Feuerwiderstandsdauer"},
+      "definition": {"de": "Zeitdauer in Minuten, für die ein Bauteil die geforderten Funktionen unter Feuerbeanspruchung erfüllen muss."},
+      "catalog_snapshot": "pilot-sia416-2026-11-23"
+    },
+    {
+      "id": "sia:concept/fluchweg",
+      "name": {"de": "Fluchweg"},
+      "definition": {"de": "Weg von einem Aufenthaltsort zur Sicherheit (Aussenraum, sichere Stiegenanlage oder Brandabschnitt)."},
+      "catalog_snapshot": "pilot-sia416-2026-11-23"
+    },
+    {
+      "id": "sia:concept/brandabschnitt",
+      "name": {"de": "Brandabschnitt"},
+      "definition": {"de": "Teil eines Gebäudes, der von benachbarten Teilen durch brandschutztechnische Trennungen abgegrenzt ist."},
+      "catalog_snapshot": "pilot-sia416-2026-11-23"
+    },
+    {
+      "id": "sia:concept/tragende-konstruktion",
+      "name": {"de": "Tragende Konstruktion"},
+      "definition": {"de": "Bauteil, das Lasten aufnimmt und weiterleitet (z. B. Wand, Decke, Stütze, Balkon)."},
+      "catalog_snapshot": "pilot-sia416-2026-11-23"
+    }
+  ]
+}

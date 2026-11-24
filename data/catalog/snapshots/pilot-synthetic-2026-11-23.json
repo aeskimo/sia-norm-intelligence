@@ -1,0 +1,29 @@
+{
+  "snapshot_id": "pilot-synthetic-2026-11-23",
+  "concepts": [
+    {
+      "id": "sia:concept/gesamtflaeche",
+      "name": {"de": "Gesamtfläche"},
+      "definition": {"de": "Synthetischer Testbegriff (Platzhalter, kein Norminhalt). IFC-Mapping ist synthetischer Platzhalter."},
+      "unit": "m2",
+      "mappings": {"ifc": {"entity": "IfcSpace", "property_set": "Pset_SpaceCommon", "base_name": "NetFloorArea"}},
+      "catalog_snapshot": "pilot-synthetic-2026-11-23"
+    },
+    {
+      "id": "sia:concept/teilsflaeche-a",
+      "name": {"de": "Teilsfläche A"},
+      "definition": {"de": "Synthetischer Testbegriff (Platzhalter, kein Norminhalt). IFC-Mapping ist synthetischer Platzhalter."},
+      "unit": "m2",
+      "mappings": {"ifc": {"entity": "IfcSpace", "property_set": "Pset_SpaceCommon", "base_name": "Area"}},
+      "catalog_snapshot": "pilot-synthetic-2026-11-23"
+    },
+    {
+      "id": "sia:concept/teilsflaeche-b",
+      "name": {"de": "Teilsfläche B"},
+      "definition": {"de": "Synthetischer Testbegriff (Platzhalter, kein Norminhalt). IFC-Mapping ist synthetischer Platzhalter."},
+      "unit": "m2",
+      "mappings": {"ifc": {"entity": "IfcSpace", "property_set": "Pset_SpaceCommon", "base_name": "WallArea"}},
+      "catalog_snapshot": "pilot-synthetic-2026-11-23"
+    }
+  ]
+}

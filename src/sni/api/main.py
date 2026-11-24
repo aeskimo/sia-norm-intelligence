@@ -1,8 +1,10 @@
 """FastAPI-Endpunkte (M1: GET /v1/concepts/{id}; M4: POST /v1/answer;
-M5: POST /v1/check; M7: /v1/export/*).
+M5: POST /v1/check; Integration M3.5: POST /v1/projectdata (ADR-0006);
+M7: /v1/export/*).
 
-Fachlogik bleibt in sni.catalog (Katalog), sni.service (Antwort-Pipeline)
-bzw. sni.export (Serialisierung, ADR-0005).
+Fachlogik bleibt in sni.catalog (Katalog), sni.service (Antwort-Pipeline),
+sni.projectdata (Projektwerte-Upload, ADR-0006) bzw. sni.export
+(Serialisierung, ADR-0005).
 Hinweis G6: Jede fachliche API-Antwort trägt das Feld ``disclaimer``.
 ``/healthz`` ist ein reiner Liveness-Check ohne fachlichen Inhalt.
 """
@@ -10,10 +12,14 @@ Hinweis G6: Jede fachliche API-Antwort trägt das Feld ``disclaimer``.
 from __future__ import annotations
 
 import atexit
+import json
+import tempfile
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Form, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
@@ -21,7 +27,19 @@ from sni.catalog.store import ConceptStore
 from sni.export.bcf import BcfExportError, bcf_bytes
 from sni.export.ids import IdsExportError, IdsValidationError, export_ids
 from sni.export.skos import CatalogExportError, catalog_json, catalog_ttl
-from sni.knowledge.store import DEFAULT_KNOWLEDGE_DIR, KnowledgeBase, load_knowledge
+from sni.knowledge.store import (
+    DEFAULT_KNOWLEDGE_DIR,
+    KnowledgeBase,
+    KnowledgeLoadError,
+    load_knowledge,
+)
+from sni.projectdata.models import ProjectDataError
+from sni.projectdata.upload import (
+    UploadError,
+    UploadServiceError,
+    load_upload,
+    projectdata_response,
+)
 from sni.rules.engine import DEFAULT_RULES_DIR, RuleLoadError, load_rules
 from sni.service.answerer import AnswerError, AnswerInputError, AnswerRequest, answer
 from sni.service.checker import CheckError, CheckInputError, check
@@ -50,6 +68,30 @@ class IdsPayload(BaseModel):
     rule_ids: list[str] | None = None
 
 
+def _ifc_mapping_from_catalog(store: ConceptStore) -> dict[str, str]:
+    """Quantity-Mapping aus dem Katalog (ADR-0006): base_name -> Concept-ID.
+
+    Verwendet alle Concepts mit vollständigem IFC-Mapping
+    (``mappings.ifc.base_name``); ohne Mapping ein leeres Dict (die API
+    lehnt dann ab – G5: nie raten).
+    """
+    mapping: dict[str, str] = {}
+    for concept_id in store.concept_ids():
+        concept = store.get_concept(concept_id)
+        if concept is None:
+            continue
+        raw_mappings: object = concept.get("mappings")
+        if not isinstance(raw_mappings, dict):
+            continue
+        raw_ifc: object = raw_mappings.get("ifc")
+        if not isinstance(raw_ifc, dict):
+            continue
+        base_name: object = raw_ifc.get("base_name")
+        if isinstance(base_name, str) and base_name:
+            mapping[base_name] = concept_id
+    return mapping
+
+
 def create_app(
     db_path: Path | None = None,
     knowledge_dir: Path | None = None,
@@ -60,11 +102,12 @@ def create_app(
     ``db_path``: standardmässig data/catalog/catalog.db;
     ``knowledge_dir``: standardmässig data/extracted/ (lokaler Mount, G3/G4);
     ``rules_dir``: standardmässig data/rules/ (lokaler Mount, G3/G4).
-    Regeln werden pro Request geladen (lokale Mounts, kein Startup-State).
+    Regeln und Wissensbasis werden pro Request geladen (lokale Mounts, kein
+    Startup-State), damit eine Freigabe in data/extracted/ ohne Neustart wirkt.
     """
     app = FastAPI(title="SIA Norm Intelligence", version="0.1.0")
     app.state.store = ConceptStore(db_path or DEFAULT_DB_PATH)
-    app.state.knowledge = load_knowledge(knowledge_dir or DEFAULT_KNOWLEDGE_DIR)
+    app.state.knowledge_dir = knowledge_dir or DEFAULT_KNOWLEDGE_DIR
     app.state.rules_dir = rules_dir or DEFAULT_RULES_DIR
 
     @app.get("/healthz")
@@ -95,7 +138,13 @@ def create_app(
         Projektdaten, 500 = interne Antwortfehler (z. B. fehlende Schemakonformität).
         """
         store: ConceptStore = request.app.state.store
-        knowledge: KnowledgeBase = request.app.state.knowledge
+        try:
+            knowledge: KnowledgeBase = load_knowledge(request.app.state.knowledge_dir)
+        except KnowledgeLoadError as exc:
+            return JSONResponse(
+                status_code=500,
+                content={"error": f"Wissensbasis unlesbar: {exc}", "disclaimer": DISCLAIMER},
+            )
         if not payload.question.strip():
             return JSONResponse(
                 status_code=400,
@@ -143,6 +192,85 @@ def create_app(
                 status_code=500, content={"error": str(exc), "disclaimer": DISCLAIMER}
             )
         return JSONResponse(content=result)
+
+    @app.post("/v1/projectdata")
+    async def projectdata_endpoint(
+        file: UploadFile,
+        request: Request,
+        quantity_mapping: Annotated[str | None, Form()] = None,
+    ) -> JSONResponse:
+        """REQ-500 (ADR-0006): CSV/IFC-Upload -> normalisierte Projektwerte.
+
+        400 = unbekanntes Format (Endung), zu grosse Datei, fehlerhafter
+        Inhalt (KBOB-Bericht des Adapters), fehlendes IFC-Mapping oder
+        ungültiges Mapping-JSON; 422 = fehlendes ``file``-Feld; 500 =
+        nicht schemakonformes internes Ergebnis. 200 = Antwort gegen
+        ``project_values.schema.json`` validiert (DoD). G6: Disclaimer.
+        """
+        if not file.filename:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": "Dateiname fehlt (form-data-Feld 'file')",
+                    "disclaimer": DISCLAIMER,
+                },
+            )
+        mapping: Mapping[str, str] | None = None
+        if Path(file.filename).suffix.lower() == ".ifc":
+            if quantity_mapping is not None:
+                try:
+                    parsed: object = json.loads(quantity_mapping)
+                except json.JSONDecodeError as exc:
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "error": (f"quantity_mapping ist kein gültiges JSON: {exc}"),
+                            "disclaimer": DISCLAIMER,
+                        },
+                    )
+                if not isinstance(parsed, dict) or not all(
+                    isinstance(key, str) and isinstance(val, str) for key, val in parsed.items()
+                ):
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "error": (
+                                "quantity_mapping muss ein JSON-Objekt "
+                                "{Mengen-Name: Concept-ID} sein"
+                            ),
+                            "disclaimer": DISCLAIMER,
+                        },
+                    )
+                mapping = {str(k): str(v) for k, v in parsed.items()}
+            else:
+                mapping = _ifc_mapping_from_catalog(request.app.state.store)
+                if not mapping:
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "error": (
+                                "Kein Quantity-Mapping verfügbar: kein "
+                                "IFC-Mapping im Katalog und keine "
+                                "quantity_mapping im Request (G5: nie raten)"
+                            ),
+                            "disclaimer": DISCLAIMER,
+                        },
+                    )
+        data = await file.read()
+        try:
+            with tempfile.TemporaryDirectory(prefix="sni-upload-") as tmp:
+                result = load_upload(file.filename, data, mapping, Path(tmp))
+        except (UploadError, ProjectDataError) as exc:
+            return JSONResponse(
+                status_code=400, content={"error": str(exc), "disclaimer": DISCLAIMER}
+            )
+        try:
+            payload = projectdata_response(result, DISCLAIMER)
+        except UploadServiceError as exc:
+            return JSONResponse(
+                status_code=500, content={"error": str(exc), "disclaimer": DISCLAIMER}
+            )
+        return JSONResponse(content=payload)
 
     @app.get("/v1/export/catalog")
     def export_catalog(

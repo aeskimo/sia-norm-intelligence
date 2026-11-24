@@ -10,13 +10,16 @@ endif
 
 .DEFAULT_GOAL := check
 
-.PHONY: setup check eval run ingest extract
-
-extract:
-	$(SYSTEM_PY) scripts/make.py extract $(NORM)
+.PHONY: setup check eval run ingest extract snapshot
 
 ingest:
 	$(SYSTEM_PY) scripts/make.py ingest $(NORM)
+
+snapshot:
+	$(SYSTEM_PY) scripts/make.py snapshot $(FILE)
+
+extract:
+	$(SYSTEM_PY) scripts/make.py extract $(NORM)
 
 setup:
 	$(SYSTEM_PY) scripts/make.py setup
