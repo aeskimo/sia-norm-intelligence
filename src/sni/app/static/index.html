@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'">
+  <title>SIA-Normenassistent</title>
+  <link rel="stylesheet" href="/static/sia.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebar-title">SIA-Normenassistent</div>
+      <nav class="nav" aria-label="Hauptnavigation">
+        <a class="nav-item" href="#/catalog">Normenkatalog</a>
+        <a class="nav-item" href="#/norms">Meine Normen</a>
+        <a class="nav-item" href="#/assistant">Normenassistent</a>
+        <a class="nav-item" href="#/intelligence">Norm Intelligence</a>
+        <a class="nav-item" href="#/models">Lokale Modelle</a>
+        <a class="nav-item" href="#/settings">Einstellungen</a>
+      </nav>
+    </aside>
+
+    <main id="view">
+      <section class="view" id="view-catalog" data-view="catalog">
+        <h1>Normenkatalog</h1>
+        <div class="card">
+          <h2 class="card-title">Login</h2>
+          <p class="muted">In M8.2: Provider, Kundennummer, Passwort, Device-ID, „Merken“.</p>
+        </div>
+        <div class="card">
+          <h2 class="card-title">Katalog</h2>
+          <p class="muted">In M8.2: Normen-Tabelle mit Statusfilter.</p>
+        </div>
+        <div class="status-row" aria-live="polite"><span class="status-dot neutral" aria-hidden="true"></span><span class="status-text">Bereit.</span></div>
+      </section>
+
+      <section class="view" id="view-norms" data-view="norms" hidden>
+        <h1>Meine Normen</h1>
+        <div class="card">
+          <h2 class="card-title">Lokale Dokumente</h2>
+          <p class="muted">In M8.2/803: lokale Dokumente mit Status und Aktionen (Öffnen, Analysieren, Entfernen).</p>
+        </div>
+        <div class="status-row" aria-live="polite"><span class="status-dot neutral" aria-hidden="true"></span><span class="status-text">Bereit.</span></div>
+      </section>
+
+      <section class="view" id="view-assistant" data-view="assistant" hidden>
+        <h1>Normenassistent</h1>
+        <div class="card">
+          <h2 class="card-title">Frage &amp; Antwort</h2>
+          <p class="muted">In M8.3: Fragefeld, gestreamte Antwort, Quellen mit Zitat-Navigation.</p>
+        </div>
+        <div class="status-row" aria-live="polite"><span class="status-dot neutral" aria-hidden="true"></span><span class="status-text">Bereit.</span></div>
+      </section>
+
+      <section class="view" id="view-intelligence" data-view="intelligence" hidden>
+        <h1>Norm Intelligence</h1>
+        <div class="card">
+          <h2 class="card-title">Deterministische Normfragen</h2>
+          <p class="muted">In M8.5: Aussageklasse, Claims, Fundstellen, Review-Queue, Projektdaten.</p>
+        </div>
+        <div class="status-row" aria-live="polite"><span class="status-dot neutral" aria-hidden="true"></span><span class="status-text">Bereit.</span></div>
+      </section>
+
+      <section class="view" id="view-models" data-view="models" hidden>
+        <h1>Lokale Modelle</h1>
+        <div class="card">
+          <h2 class="card-title">Ollama</h2>
+          <p class="muted">In M8.4: Modell-Liste, Pull, Delete, aktives Modell.</p>
+        </div>
+        <div class="status-row" aria-live="polite"><span class="status-dot neutral" aria-hidden="true"></span><span class="status-text">Bereit.</span></div>
+      </section>
+
+      <section class="view" id="view-settings" data-view="settings" hidden>
+        <h1>Einstellungen</h1>
+        <div class="card">
+          <h2 class="card-title">App</h2>
+          <p class="muted">In M8.4: Modelle, Provider, gibb-Anschluss, Freigabeperson (G3), Datenverzeichnis.</p>
+        </div>
+        <div class="status-row" aria-live="polite"><span class="status-dot neutral" aria-hidden="true"></span><span class="status-text">Bereit.</span></div>
+      </section>
+    </main>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

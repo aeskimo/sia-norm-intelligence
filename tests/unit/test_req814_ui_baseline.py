@@ -1,0 +1,83 @@
+"""REQ-814/REQ-800: UI-Gerüst — statische Dateien und Design-Baseline.
+
+Prüft, dass das UI-Gerüst (M8.1) die Baseline trägt: 6 Views,
+SIA-Design-Tokens (Light + Dark via prefers-color-scheme), CSP,
+Session-Token-Handling und volle Offline-Fähigkeit (keine externen
+Resources).
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+STATIC = Path(__file__).resolve().parents[2] / "src" / "sni" / "app" / "static"
+
+VIEWS = ("catalog", "norms", "assistant", "intelligence", "models", "settings")
+
+
+def _read(name: str) -> str:
+    assert (STATIC / name).is_file(), f"UI-Datei fehlt: {name}"
+    return (STATIC / name).read_text(encoding="utf-8")
+
+
+def test_req814_index_has_all_six_views() -> None:
+    # Given die UI When geladen Then alle 6 Views (Java-Tabs) existieren
+    html = _read("index.html")
+    for view in VIEWS:
+        assert f'href="#/{view}"' in html, f"Nav-Link #{view} fehlt"
+        assert f'id="view-{view}"' in html, f"View-Sektion {view} fehlt"
+
+
+def test_req814_index_is_deutsch_and_has_csp() -> None:
+    # Given die UI When geladen Then Deutsch + CSP default-src 'self'
+    html = _read("index.html")
+    assert 'lang="de"' in html
+    assert "Content-Security-Policy" in html and "default-src 'self'" in html
+
+
+def test_req814_index_status_rows_are_live_regions() -> None:
+    # Given die UI When geladen Then Statuszeilen sind aria-live (Barrierefreiheit)
+    html = _read("index.html")
+    assert html.count('aria-live="polite"') >= len(VIEWS)
+
+
+def test_req814_css_has_sia_design_tokens() -> None:
+    # Given das Design-System When geprüft Then SIA-Tokens (Java-Palette)
+    css = _read("sia.css")
+    for token in (
+        "--window: #F5F5F7",
+        "--surface: #FFFFFF",
+        "--text: #1D1D1F",
+        "--accent: #0066E6",
+        "--radius-card: 12px",
+    ):
+        assert token in css, f"Token fehlt: {token}"
+
+
+def test_req814_css_has_dark_mode() -> None:
+    # Given das Design-System When Dark Mode Then prefers-color-scheme mit
+    # DARK-Palette (wie SiaDesign in Java)
+    css = _read("sia.css")
+    assert "prefers-color-scheme: dark" in css
+    assert "--window: #1E1E1E" in css
+    assert "--text: #F2F2F7" in css
+
+
+def test_req814_js_handles_session_token_in_memory() -> None:
+    # Given die UI-Logik When gestartet Then Token kommt aus der URL und
+    # wird an API-Requests übergeben (REQ-816)
+    js = _read("app.js")
+    assert 'params.get("sia_token")' in js
+    assert '"x-sia-token": siaToken' in js
+    # Token wird aus der Adressleiste entfernt
+    assert "history.replaceState" in js
+
+
+def test_req814_ui_is_fully_offline() -> None:
+    # Given die UI (G4/CSP) When geprüft Then keine externen Resources
+    for name in ("index.html", "sia.css", "app.js"):
+        content = _read(name)
+        for line in content.splitlines():
+            assert "http://" not in line and "https://" not in line, (
+                f"Externe Resource in {name}: {line.strip()[:60]}"
+            )

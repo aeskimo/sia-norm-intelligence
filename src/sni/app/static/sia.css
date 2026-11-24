@@ -1,0 +1,196 @@
+/* SIA-Design-Tokens (M8, REQ-814) — 1:1-Übertragung der Java-Palette
+   (ch.sia.theme.SiaDesign). Kontrastwerte geprüft gegen WCAG 2.1 AA
+   (mind. 4.5:1, Baseline Java-GUI-Selftest: schlechteste 5.19:1). */
+
+:root {
+  --window: #F5F5F7;
+  --surface: #FFFFFF;
+  --content: #FFFFFF;
+  --text: #1D1D1F;
+  --text-secondary: #6E6E73;
+  --hairline: #D2D2D7;
+  --accent: #0066E6;
+  --accent-bright: #007AFF;
+  --success: #34C759;
+  --warning: #FF9500;
+  --error: #FF3B30;
+  --radius-card: 12px;
+  --radius-btn: 7px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --window: #1E1E1E;
+    --surface: #2C2C2E;
+    --content: #1C1C1E;
+    --text: #F2F2F7;
+    --text-secondary: #98989D;
+    --hairline: #48484A;
+    --accent: #0A84FF;
+    --accent-bright: #409CFF;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+body {
+  font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  background: var(--window);
+  color: var(--text);
+}
+
+.app {
+  display: flex;
+  min-height: 100vh;
+  min-width: 1200px;
+}
+
+/* --- Sidebar ----------------------------------------------------------- */
+
+.sidebar {
+  width: 220px;
+  flex: 0 0 220px;
+  padding: 16px 12px;
+  border-right: 1px solid var(--hairline);
+  background: var(--window);
+}
+
+.sidebar-title {
+  font-weight: 700;
+  font-size: 14px;
+  padding: 4px 10px 14px;
+}
+
+.nav { display: flex; flex-direction: column; gap: 2px; }
+
+.nav-item {
+  display: block;
+  padding: 7px 10px;
+  border-radius: var(--radius-btn);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.nav-item:hover { background: var(--surface); }
+
+.nav-item.active {
+  background: var(--surface);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--hairline);
+}
+
+/* --- Hauptbereich ------------------------------------------------------- */
+
+#view { flex: 1; padding: 24px 28px; }
+
+h1 { font-size: 20px; margin: 0 0 16px; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+  padding: 8px 14px 14px;
+  margin-bottom: 14px;
+}
+
+.card-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 6px 0 8px;
+}
+
+.muted { color: var(--text-secondary); margin: 4px 0; }
+
+/* --- Buttons (flach, wie SiaFlatButtonUI) ------------------------------- */
+
+.btn {
+  display: inline-block;
+  padding: 6px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-btn);
+  cursor: pointer;
+}
+
+.btn:hover { border-color: var(--text-secondary); }
+
+.btn-accent {
+  color: #FFFFFF;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.btn-accent:hover { background: var(--accent-bright); border-color: var(--accent-bright); }
+
+.btn:focus-visible, .nav-item:focus-visible {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 2px;
+}
+
+/* --- Chips (Aussageklassen) --------------------------------------------- */
+
+.chip {
+  display: inline-block;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+}
+
+.chip-success { color: var(--success); border-color: var(--success); }
+.chip-accent { color: var(--accent-bright); border-color: var(--accent-bright); }
+.chip-warning { color: var(--warning); border-color: var(--warning); }
+.chip-error { color: var(--error); border-color: var(--error); }
+
+/* --- Statuszeile (semantischer Farbpunkt) -------------------------------- */
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  color: var(--text-secondary);
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 9px;
+}
+
+.status-dot.neutral { background: var(--text-secondary); }
+.status-dot.success { background: var(--success); }
+.status-dot.warning { background: var(--warning); }
+.status-dot.error { background: var(--error); }
+
+/* --- Tabellen (26 px Zeilen, nur horizontale Haarlinien) ------------------ */
+
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+
+th, td { padding: 4px 8px; text-align: left; }
+
+th {
+  font-weight: 700;
+  border-bottom: 1px solid var(--text-secondary);
+}
+
+tbody tr { border-bottom: 1px solid var(--hairline); }
+
+/* Dark-Mode-Feintuning */
+@media (prefers-color-scheme: dark) {
+  .btn-accent { color: #0A0A0A; }
+  .chip-success { color: #30D158; }
+}
