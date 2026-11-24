@@ -45,6 +45,7 @@ jobs:
             gir1.2-gtk-3.0 gir1.2-webkit2-4.1 xvfb \
             libgirepository-2.0-dev libcairo2-dev pkg-config
       - name: Install build dependencies
+        shell: bash
         run: |
           pip install pywebview pyinstaller
           if [ "$RUNNER_OS" = "Linux" ]; then
@@ -54,6 +55,7 @@ jobs:
             pip install "PyGObject<3.59"
           fi
       - name: Build hello window (PyInstaller onefile)
+        shell: bash
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then
             # gi wird nicht automatisch von PyInstaller erfasst.
