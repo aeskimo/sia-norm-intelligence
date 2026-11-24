@@ -43,11 +43,6 @@ Jeder Milestone ist erst fertig, wenn alle Kriterien als Test existieren und gr�
 - REQ-701: Regel → IDS-Spezifikation (wo abbildbar), sonst GapReport `not_ids_expressible`
 - REQ-702: Prüfergebnisse `fail` als BCF-Topic exportierbar
 
-## M8 – Echte Normdokumente: PDF-Extraktion (OQ-003, ADR-0006)
-- REQ-800: Given ein PDF unter `data/norms/<norm-id>/document.pdf` When `make extract NORM=<norm-id>` Then entsteht `document.draft.json` mit Ziffern-Skelett (Ziffernnummern am Zeilenanfang, deterministisch) und extrahiertem Ziffern-Text; Fachfelder bleiben leer; der Entwurf ist validiert gegen `document_draft.schema.json`
-- REQ-801: Extraktion ist atomar: alle Fehler werden gesammelt als Bericht geliefert; bei Fehlern wird keine Datei geschrieben (KBOB-Muster)
-- REQ-802: G4: Fehlerbericht und CLI-Ausgabe enthalten nur Norm-ID, Ziffern, Feldnamen und Zählungen – nie Normtexte
-- REQ-803: Given ein extrahierter Entwurf When die Fachperson die `document.json` vervollständigt (Stufe 2, manuell) Then erzeugt die bestehende Ingest-Pipeline (M2) unverändert Kandidaten mit Fundstelle
 ## M8 – Consumer-App (Web-UI auf dem SNI-Kern; siehe 09_CONSUMER_APP.md)
 - REQ-800: `python -m sni.app` startet die UI als Fenster (pywebview), Browser (`--browser`) und Headless (`--headless`); UI und API same-origin auf `127.0.0.1` (kein CORS)
 - REQ-801: SIA-Login (SOAP-Port: ECHO, `getLizenzDatei`, `getDocument_Byte`; Provider SIA/VSS/PHGR/SWKI; stabile Device-ID) liefert den Katalog inkl. Status; Protokoll-Fehlercodes werden 1:1 weitergegeben
@@ -67,3 +62,9 @@ Jeder Milestone ist erst fertig, wenn alle Kriterien als Test existieren und gr�
 - REQ-815: Migration des Java-Stands beim ersten Start: `workspace.state` (SIASST1) → `workspace.json`, `*.siaidx` (SIAIDX01) → `.sniidx` (Byte-kompatibler Importer); Keychain-Einträge: macOS lesbar unter gleichem Service/Account (Test), Windows/Linux ohne Java-Einträge (dokumentierte Abwesenheit)
 - REQ-816: App-API-Sicherheit (nur `app_mode`): zufälliger freier Port pro Start (Fenster-/Browser-Modus), Session-Token (Launcher → UI, Pflicht auf `/v1/*`), `Host`-Header muss loopback sein, nicht-same-origin `Origin` wird abgelehnt (Schutz gegen CSRF/DNS-Rebinding, G4)
 - REQ-817: Packaging-Smoke in M8.1: minimale App (Hello Window) wird in der CI auf ubuntu/macos/windows gebaut und gestartet (PyInstaller + pywebview; WebView2/WebKitGTK); echte Installer inkl. Code-Signing/Notarization (OQ-014) in M8.6
+
+## M9 – Echte Normdokumente: PDF-Extraktion (OQ-003, ADR-0010)
+- REQ-900: Given ein PDF unter `data/norms/<norm-id>/document.pdf` When `make extract NORM=<norm-id>` Then entsteht `document.draft.json` mit Ziffern-Skelett (Ziffernnummern am Zeilenanfang, deterministisch) und extrahiertem Ziffern-Text; Fachfelder bleiben leer; der Entwurf ist validiert gegen `document_draft.schema.json`
+- REQ-901: Extraktion ist atomar: alle Fehler werden gesammelt als Bericht geliefert; bei Fehlern wird keine Datei geschrieben (KBOB-Muster)
+- REQ-902: G4: Fehlerbericht und CLI-Ausgabe enthalten nur Norm-ID, Ziffern, Feldnamen und Zählungen – nie Normtexte
+- REQ-903: Given ein extrahierter Entwurf When die Fachperson die `document.json` vervollständigt (Stufe 2, manuell) Then erzeugt die bestehende Ingest-Pipeline (M2) unverändert Kandidaten mit Fundstelle

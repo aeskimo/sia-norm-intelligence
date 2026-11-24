@@ -8,7 +8,7 @@ export/       Export: SKOS/Turtle, IDS, BCF (M7)
 rules/        Regel-Engine (sichere Ausdrucksauswertung, kein eval())
 knowledge/    NormStatement, SourceReference, Editions
 catalog/      Concept, Property, Relation, Import CatalogSnapshot
-ingest/       Normdokument → Kandidaten-Objekte (inkl. Human Review Queue, PDF-Extraktion M8)
+ingest/       Normdokument → Kandidaten-Objekte (inkl. Human Review Queue, PDF-Extraktion M9)
 projectdata/  IFC-/CSV-Adapter → normalisierte Projektwerte
 core/         Basistypen, IDs, Schemas, Fehler
 ```

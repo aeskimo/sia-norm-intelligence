@@ -1,5 +1,5 @@
-# ADR-0006: Extraktionsweg für reale Normdokumente (PDF → document.json)
-- Status: vorgeschlagen – Freigabe durch User erforderlich
+# ADR-0010: Extraktionsweg für reale Normdokumente (PDF → document.json)
+- Status: akzeptiert (User-Entscheid 2026-11-24)
 - Datum: 2026-11-23
 - Kontext: OQ-003 wurde mit User-Input beantwortet (2026-11-23): echte
   SIA-Normen liegen als **PDF (Print-Ausgabe)** vor und sind **nur über
@@ -21,7 +21,7 @@
      Sessions dürfen nicht im Tool gepflegt werden (Credentials,
      2FA, Nutzungsbedingungen des Portals); die Pipeline bleibt
      vollständig offline (keine neue Netzwerk-Abhängigkeit).
-  2. **Stufe 1 – Deterministische PDF-Extraktion (M8, neu):**
+  2. **Stufe 1 – Deterministische PDF-Extraktion (M9, neu):**
      `make extract NORM=<norm-id>` liest
      `data/norms/<norm-id>/document.pdf` und schreibt
      `data/norms/<norm-id>/document.draft.json`: Ziffern-Skelett
@@ -94,7 +94,7 @@
 
 ## Addendum (2026-11-23): Pilot-Korrektur Stufe 1
 
-Status unverändert: **vorgeschlagen** – das Addendum dokumentiert die
+Status: **akzeptiert** (User-Entscheid 2026-11-24) – das Addendum dokumentiert die
 Pilot-Korrektur der Stufe-1-Heuristik am echten Dokument `sia101-2020`
 (48 Seiten, lokaler Mount, G4). Der Pilot hat den ursprünglichen
 Zeilen-Regex-Entwurf als unbrauchbar identifiziert: 31 erkannte „Ziffern“,

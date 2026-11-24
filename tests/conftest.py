@@ -261,7 +261,7 @@ def write_norm_pdf(
     start_x: float = 72.0,
     start_y: float = 800.0,
 ) -> Path:
-    """Schreibt ``document.pdf`` in den lokalen Mount (Test-Helfer, M8)."""
+    """Schreibt ``document.pdf`` in den lokalen Mount (Test-Helfer, M9)."""
     norm_dir = norms_dir / norm_id
     norm_dir.mkdir(parents=True)
     if pages is None:
@@ -272,7 +272,7 @@ def write_norm_pdf(
 
 
 def load_draft(norm_id: str, norms_dir: Path) -> dict[str, object]:
-    """Lädt ``document.draft.json`` aus dem Mount (Test-Helfer, M8)."""
+    """Lädt ``document.draft.json`` aus dem Mount (Test-Helfer, M9)."""
     raw: object = json.loads(
         (norms_dir / norm_id / "document.draft.json").read_text(encoding="utf-8")
     )

@@ -1,13 +1,13 @@
-"""Deterministische PDF-Extraktion: document.pdf → document.draft.json (M8, ADR-0006).
+"""Deterministische PDF-Extraktion: document.pdf → document.draft.json (M9, ADR-0010).
 
 Stufe 1 des Extraktionswegs für echte Normdokumente (OQ-003). Die Maschine
 belegt nur das Ziffern-Skelett und den extrahierten Ziffern-Text (lokal, nur
 für die Vervollständigung in Stufe 2). Fachliche Felder (statement_type,
 obligation, summary, concepts) bleiben leer – G1: keine fachlichen Inhalte
 erfinden. Tabellen und Formeln werden in v1 nicht automatisch erkannt
-(ADR-0006).
+(ADR-0010).
 
-Heuristik (Pilot-Korrektur, ADR-0006): Kandidat ist eine Zeile, deren
+Heuristik (Pilot-Korrektur, ADR-0010): Kandidat ist eine Zeile, deren
 (gestrippter) Text mit einer Ziffernnummer beginnt – mit Titel oder karg
 (ganze Zeile ist die Ziffer). Zeilen entstehen aus den pypdf-Visitor-Chunks
 (Chunk-Konkatenation == ``extract_text()``-Output, auf dem Pilot-Dokument
@@ -155,7 +155,7 @@ def extract_pdf(norm_id: str, norms_dir: Path = DEFAULT_NORMS_DIR) -> ExtractRes
     if not lines:
         errors.append(
             f"PDF {pdf_path.name}: kein extrahierbarer Text"
-            " (gescanntes PDF? OCR ist v1-ausserhalb, ADR-0006)"
+            " (gescanntes PDF? OCR ist v1-ausserhalb, ADR-0010)"
         )
 
     clauses = _detect_clauses(lines)
@@ -250,7 +250,7 @@ def _font_base_name(font_dict: object) -> str:
 
 
 def _detect_clauses(lines: list[_Line]) -> list[_Clause]:
-    """Erkennt Ziffernnummern (deterministisch, Zwei-Pass, ADR-0006).
+    """Erkennt Ziffernnummern (deterministisch, Zwei-Pass, ADR-0010).
 
     1. Kandidaten sammeln (Zeile beginnt mit Ziffernnummer, mit oder ohne Titel)
     2. Typografie-Filter F1–F5 pro Kandidat (Two-Pass: F4 zaehlt alle Kandidaten)
@@ -329,7 +329,7 @@ def _passes_filters(
     has_bold: bool,
     page_counts: dict[tuple[str, int], set[int]],
 ) -> bool:
-    """F1–F5: Typografie- und Zahlenregeln (alle muss gelten, ADR-0006)."""
+    """F1–F5: Typografie- und Zahlenregeln (alle muss gelten, ADR-0010)."""
     if not _valid_number(c.number):
         return False  # F2: 0-Komponente / führende Null -> Wert, keine Ziffer
     if has_bold and not c.first_bold:

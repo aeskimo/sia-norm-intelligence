@@ -20,7 +20,7 @@ IDs sind unveränderlich. Änderungen erzeugen neue Versionen, nie Überschreibu
 | DocumentDraft (Arbeitsdatei) | `document_draft.schema.json` | `extract` (Maschine) als Entwurf | Fachperson (Stufe 2, manuell) |
 
 `DocumentDraft` ist eine lokale Arbeitsdatei (`data/norms/<norm-id>/document.draft.json`,
-M8/ADR-0006): enthält extrahierten Normtext und kommt deshalb **nie ins Repo** (G4).
+M9/ADR-0010): enthält extrahierten Normtext und kommt deshalb **nie ins Repo** (G4).
 Die Maschine belegt nur Ziffern-Skelett und Text (G1); die Fachfelder bleiben bis zur
 manuellen Vervollständigung leer.
 

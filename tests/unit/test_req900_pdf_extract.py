@@ -1,4 +1,4 @@
-"""REQ-800: Given ein PDF unter data/norms/<norm-id>/document.pdf When `make extract`
+"""REQ-900: Given ein PDF unter data/norms/<norm-id>/document.pdf When `make extract`
 Then entsteht document.draft.json mit Ziffern-Skelett (Ziffernnummern am
 Zeilenanfang, deterministisch) und extrahiertem Ziffern-Text; Fachfelder bleiben
 leer; der Entwurf ist validiert gegen document_draft.schema.json."""
@@ -10,7 +10,7 @@ from sni.ingest.pdf_extract import extract_pdf
 from tests.conftest import PdfLine, clause_text, clauses_of, load_draft, write_norm_pdf
 
 
-def test_req800_draft_created_with_clause_skeleton(tmp_path: Path) -> None:
+def test_req900_draft_created_with_clause_skeleton(tmp_path: Path) -> None:
     norms = tmp_path / "norms"
     write_norm_pdf("syn1-2020", norms)
     result = extract_pdf("syn1-2020", norms_dir=norms)
@@ -24,7 +24,7 @@ def test_req800_draft_created_with_clause_skeleton(tmp_path: Path) -> None:
     assert [c["number"] for c in clauses_of(draft)] == ["1", "1.1", "2", "2.1", "3", "3.1"]
 
 
-def test_req800_clause_text_extracted(tmp_path: Path) -> None:
+def test_req900_clause_text_extracted(tmp_path: Path) -> None:
     norms = tmp_path / "norms"
     write_norm_pdf("syn1-2020", norms)
     extract_pdf("syn1-2020", norms_dir=norms)
@@ -37,7 +37,7 @@ def test_req800_clause_text_extracted(tmp_path: Path) -> None:
     assert "2003 war eine alte Fassung" in clause_text(by_number["2"])
 
 
-def test_req800_expert_fields_stay_empty(tmp_path: Path) -> None:
+def test_req900_expert_fields_stay_empty(tmp_path: Path) -> None:
     norms = tmp_path / "norms"
     write_norm_pdf("syn1-2020", norms)
     extract_pdf("syn1-2020", norms_dir=norms)
@@ -52,7 +52,7 @@ def test_req800_expert_fields_stay_empty(tmp_path: Path) -> None:
     assert draft["edition"] == ""
 
 
-def test_req800_draft_validates_against_schema(tmp_path: Path) -> None:
+def test_req900_draft_validates_against_schema(tmp_path: Path) -> None:
     norms = tmp_path / "norms"
     write_norm_pdf("syn1-2020", norms)
     extract_pdf("syn1-2020", norms_dir=norms)
@@ -60,7 +60,7 @@ def test_req800_draft_validates_against_schema(tmp_path: Path) -> None:
     assert list(make_validator("document_draft.schema.json").iter_errors(draft)) == []
 
 
-def test_req800_toc_and_values_are_not_clauses(tmp_path: Path) -> None:
+def test_req900_toc_and_values_are_not_clauses(tmp_path: Path) -> None:
     norms = tmp_path / "norms"
     write_norm_pdf("syn1-2020", norms)  # enthält TOC-Punktguertel, "2003", "1.5", "0.8"
     extract_pdf("syn1-2020", norms_dir=norms)
@@ -70,7 +70,7 @@ def test_req800_toc_and_values_are_not_clauses(tmp_path: Path) -> None:
     assert "0.8" not in numbers
 
 
-def test_req800_text_spans_pages(tmp_path: Path) -> None:
+def test_req900_text_spans_pages(tmp_path: Path) -> None:
     norms = tmp_path / "norms"
     pages = [
         ["3 Grenzwerte", "Testgrenzwert fuer die Testflaeche."],
@@ -86,8 +86,8 @@ def test_req800_text_spans_pages(tmp_path: Path) -> None:
     assert clause_text(by_number["4"]) == "Schluss"
 
 
-def test_req800_bold_headings_are_the_clauses(tmp_path: Path) -> None:
-    """F1 (ADR-0006): nur Ueberschriften (boldes erstes Segment) werden Ziffern;
+def test_req900_bold_headings_are_the_clauses(tmp_path: Path) -> None:
+    """F1 (ADR-0010): nur Ueberschriften (boldes erstes Segment) werden Ziffern;
     regulaere TOC-/Werte-Zeilen bleiben draussen, karge Ueberschrift "2.4" kommt rein."""
     norms = tmp_path / "norms"
     pages: list[PdfLine] = [
@@ -121,7 +121,7 @@ def test_req800_bold_headings_are_the_clauses(tmp_path: Path) -> None:
     assert "Ziel" in clause_text(by_number["1"])
 
 
-def test_req800_running_footer_rejected(tmp_path: Path) -> None:
+def test_req900_running_footer_rejected(tmp_path: Path) -> None:
     """F3: einstufige Ziffer == Seitenzahl im unteren Seitenband ist Laufzeile."""
     norms = tmp_path / "norms"
     pages: list[list[PdfLine]] = [
@@ -144,7 +144,7 @@ def test_req800_running_footer_rejected(tmp_path: Path) -> None:
     assert "Fortsetzungstext." in clause_text(by_number["1"])
 
 
-def test_req800_repeated_bold_row_rejected(tmp_path: Path) -> None:
+def test_req900_repeated_bold_row_rejected(tmp_path: Path) -> None:
     """F4: gleiche (Ziffer, Restlaenge) auf 2+ Seiten ist Tabellenkopf, keine Ziffer."""
     norms = tmp_path / "norms"
     pages: list[list[PdfLine]] = [
@@ -157,7 +157,7 @@ def test_req800_repeated_bold_row_rejected(tmp_path: Path) -> None:
     assert numbers == ["1"]
 
 
-def test_req800_zero_component_rejected(tmp_path: Path) -> None:
+def test_req900_zero_component_rejected(tmp_path: Path) -> None:
     """F2: 0-Komponenten ("4.3.0", "0.8") sind Werte, keine Ziffernnummern."""
     norms = tmp_path / "norms"
     pages: list[PdfLine] = [
@@ -172,7 +172,7 @@ def test_req800_zero_component_rejected(tmp_path: Path) -> None:
     assert numbers == ["1"]
 
 
-def test_req800_bare_number_right_of_margin_rejected(tmp_path: Path) -> None:
+def test_req900_bare_number_right_of_margin_rejected(tmp_path: Path) -> None:
     """Kare bold-Ziffer rechts ausserhalb des linken Randbereichs (Tabelle) wird abgewiesen."""
     norms = tmp_path / "norms"
     pages: list[PdfLine] = [

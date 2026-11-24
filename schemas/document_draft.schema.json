@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "sni:document_draft",
-  "description": "Lokale Arbeitsdatei data/norms/<norm-id>/document.draft.json (M8, ADR-0006): Ziffern-Skelett plus extrahierter Ziffern-Text aus document.pdf. Enthaelet lizenzierten Text -> nie ins Repo (G4). Die Maschine belegt nur Skelett und Text (G1); die Fachfelder bleiben bis zur manuellen Vervollstaendigung (Stufe 2) leer. Tabellen und Formeln werden in v1 nicht automatisch erkannt und koennen in Stufe 2 ergaenzt werden.",
+  "description": "Lokale Arbeitsdatei data/norms/<norm-id>/document.draft.json (M9, ADR-0010): Ziffern-Skelett plus extrahierter Ziffern-Text aus document.pdf. Enthaelet lizenzierten Text -> nie ins Repo (G4). Die Maschine belegt nur Skelett und Text (G1); die Fachfelder bleiben bis zur manuellen Vervollstaendigung (Stufe 2) leer. Tabellen und Formeln werden in v1 nicht automatisch erkannt und koennen in Stufe 2 ergaenzt werden.",
   "type": "object",
   "required": ["norm_id", "norm", "edition", "source_file", "page_count", "clauses"],
   "additionalProperties": false,

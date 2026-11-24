@@ -327,34 +327,6 @@ Format pro Eintrag:
   description benennt die betroffenen Concepts). Keine
   Teilabbildung (G5: schwächere Klasse bei Zweifel).
 
-## OQ-009: 8 der 9 Pilot-PDFs ohne Textschicht (reine Vektorgrafik)
-- Kontext: ADR-0006 (Pilot Stufe 1), `data/norms/` (lokaler Mount, G4),
-  REQ-800; Extraktionslauf 2026-11-23 (nur Ziffern/Zählungen, G4)
-- Frage: Die 8 übrigen Pilot-Normen – `sia17439-2020` (68 Seiten),
-  `sia19650-1-2018` (49), `sia19650-2-2018` (44), `sia19650-5-2020` (45),
-  `sia2014-2017` (28), `sia2035-2009` (32), `sia2051-2017` (52),
-  `sia4013-2021` (60) – sind reine Vektorgrafik ohne Textschicht:
-  0 extrahierbare Zeichen auf allen Seiten (pypdf, alle Seiten
-  verifiziert). Nur `sia101-2020` (48 Seiten) hat eine Textschicht
-  und liefert das korrekte 26-Ziffern-Skelett. OCR ist v1-ausserhalb
-  (ADR-0006). Was passiert mit den 8?
-- Optionen: A) Neu-Export mit Textschicht: die 8 PDFs werden mit
-  Textschicht erneut bereitgestellt (z. B. andere Download-Variante
-  des SIA-Portals) und im Mount ersetzt; Stufe 1 läuft dann
-  unverändert
-  B) Akzeptieren: in v1 werden nur Normen mit Textschicht bearbeitet,
-  die 8 fallen aus dem Pilot aus; die Pipeline meldet für sie sauber
-  „kein extrahierbarer Text“ (REQ-801, atomar)
-- Empfehlung Agent: A, falls ein Export mit Textschicht ohne Aufwand
-  möglich ist – Stufe 1 ist auf Textschicht gebaut und liefert dann
-  für alle 9 Normen deterministische Skelette; Vektorgrafik ohne OCR
-  liefert nichts. Falls nicht: B – die Pipeline ist dafür vorbereitet
-  (sauberer Fehler, kein Datenverlust, Wiederholung möglich, sobald
-  Textschicht vorhanden ist).
-- Blockiert: – (betrifft nur die 8 Normen; `sia101-2020` nicht
-  betroffen, Stufe 2 ist startklar)
-- Status: offen
-- Antwort:
 ## OQ-009: App-Shell für M8 – pywebview, Tauri oder Browser?
 - Kontext: docs/09_CONSUMER_APP.md §4, ADR-0007
 - Frage: Welches Fenster-System bekommt die Consumer-App?
@@ -462,3 +434,31 @@ Format pro Eintrag:
 - Blockiert: REQ-813 (M8.6)
 - Status: offen
 - Antwort: –
+## OQ-015: 8 der 9 Pilot-PDFs ohne Textschicht (reine Vektorgrafik)
+- Kontext: ADR-0010 (Pilot Stufe 1), `data/norms/` (lokaler Mount, G4),
+  REQ-900; Extraktionslauf 2026-11-23 (nur Ziffern/Zählungen, G4)
+- Frage: Die 8 übrigen Pilot-Normen – `sia17439-2020` (68 Seiten),
+  `sia19650-1-2018` (49), `sia19650-2-2018` (44), `sia19650-5-2020` (45),
+  `sia2014-2017` (28), `sia2035-2009` (32), `sia2051-2017` (52),
+  `sia4013-2021` (60) – sind reine Vektorgrafik ohne Textschicht:
+  0 extrahierbare Zeichen auf allen Seiten (pypdf, alle Seiten
+  verifiziert). Nur `sia101-2020` (48 Seiten) hat eine Textschicht
+  und liefert das korrekte 26-Ziffern-Skelett. OCR ist v1-ausserhalb
+  (ADR-0010). Was passiert mit den 8?
+- Optionen: A) Neu-Export mit Textschicht: die 8 PDFs werden mit
+  Textschicht erneut bereitgestellt (z. B. andere Download-Variante
+  des SIA-Portals) und im Mount ersetzt; Stufe 1 läuft dann
+  unverändert
+  B) Akzeptieren: in v1 werden nur Normen mit Textschicht bearbeitet,
+  die 8 fallen aus dem Pilot aus; die Pipeline meldet für sie sauber
+  „kein extrahierbarer Text“ (REQ-901, atomar)
+- Empfehlung Agent: A, falls ein Export mit Textschicht ohne Aufwand
+  möglich ist – Stufe 1 ist auf Textschicht gebaut und liefert dann
+  für alle 9 Normen deterministische Skelette; Vektorgrafik ohne OCR
+  liefert nichts. Falls nicht: B – die Pipeline ist dafür vorbereitet
+  (sauberer Fehler, kein Datenverlust, Wiederholung möglich, sobald
+  Textschicht vorhanden ist).
+- Blockiert: – (betrifft nur die 8 Normen; `sia101-2020` nicht
+  betroffen, Stufe 2 ist startklar)
+- Status: offen
+- Antwort:

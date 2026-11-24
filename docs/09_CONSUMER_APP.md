@@ -487,6 +487,7 @@ im Java-Projekt (Screenshot + nicht-blank).
 | Risiko | Mitigation |
 |---|---|
 | PDF-Extraktion < Java-Baseline (Semantik-Export bröckelt) | Fixture-Gate in M8.3 mit pypdfium2 **und** pdfminer.six; Fallback: Verlierer-Engine tauschen → Poppler-Option → Re-Decision (OQ-010) |
+| 8 von 9 Pilot-PDFs ohne Textschicht (reine Vektorgrafik, 0 extrahierbare Zeichen; nur `sia101-2020` liefert Text) | M9-Pilot-Befund 2026-11-23 (OQ-015, ADR-0010): REQ-804 (M8.3) ist für diese 8 Normen blockiert — weder pypdfium2 noch pdfminer.six kompensieren eine fehlende Textschicht; OCR ist v1-ausserhalb (ADR-0010). Offene User-Entscheidung OQ-015 (SIA-Neuexport mit Textschicht vs. OCR-Strategie). M8.2 und M8.4–M8.5 sind davon nicht betroffen |
 | SIA-Protokoll-Drift (SOAP, DES, Timeouts) | Protokoll-Tests mit Mock (Java-Verhalten referenziert); Retry-Logik 1:1 (1× nach 500 ms); DES per Known-Answer-Test gegen Java-Werte gesichert (REQ-801) |
 | `cryptography` macht (3-)DES decrepit (Versionsbruch) | Version pinnen; Known-Answer-Test (REQ-801); Fallback-Entscheidung per ADR, falls der Pin untragbar wird |
 | Keyring ohne Secret-Service (Linux) | File-Fallback + sichtbare Warnung; Doku |

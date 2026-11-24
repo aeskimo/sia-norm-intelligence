@@ -62,7 +62,7 @@ def main(
 
 
 def _run_extract(norm_id: str, norms_dir: Path) -> int:
-    """Stufe 1 (ADR-0006): document.pdf → document.draft.json."""
+    """Stufe 1 (ADR-0010): document.pdf → document.draft.json."""
     try:
         result = extract_pdf(norm_id, norms_dir)
     except PdfExtractError as exc:

@@ -1,4 +1,4 @@
-"""REQ-802: G4 – Fehlerbericht und CLI-Ausgabe enthalten nur Norm-ID, Ziffern,
+"""REQ-902: G4 – Fehlerbericht und CLI-Ausgabe enthalten nur Norm-ID, Ziffern,
 Feldnamen und Zählungen – nie Normtexte."""
 
 from pathlib import Path
@@ -12,7 +12,7 @@ from tests.conftest import write_norm_pdf
 MARKER = "ZZG4MARKER987"
 
 
-def test_req802_error_report_contains_no_norm_text(tmp_path: Path) -> None:
+def test_req902_error_report_contains_no_norm_text(tmp_path: Path) -> None:
     norms = tmp_path / "norms"
     write_norm_pdf("syn1-2020", norms, pages=[f"Keine Ziffern, {MARKER} in diesem Text."])
     with pytest.raises(PdfExtractError) as excinfo:
@@ -21,7 +21,7 @@ def test_req802_error_report_contains_no_norm_text(tmp_path: Path) -> None:
     assert any("keine Ziffern erkannt" in line for line in excinfo.value.report)
 
 
-def test_req802_corrupt_pdf_report_references_only_filename(tmp_path: Path) -> None:
+def test_req902_corrupt_pdf_report_references_only_filename(tmp_path: Path) -> None:
     norms = tmp_path / "norms"
     norm_dir = norms / "syn1-2020"
     norm_dir.mkdir(parents=True)
@@ -33,7 +33,7 @@ def test_req802_corrupt_pdf_report_references_only_filename(tmp_path: Path) -> N
     assert "kaputt" not in joined
 
 
-def test_req802_cli_success_output_contains_no_norm_text(
+def test_req902_cli_success_output_contains_no_norm_text(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     norms = tmp_path / "norms"
@@ -46,7 +46,7 @@ def test_req802_cli_success_output_contains_no_norm_text(
     assert MARKER not in out
 
 
-def test_req802_cli_error_output_contains_no_norm_text(
+def test_req902_cli_error_output_contains_no_norm_text(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     norms = tmp_path / "norms"

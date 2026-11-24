@@ -1,6 +1,6 @@
-"""REQ-803: End-to-End – PDF → Entwurf (Stufe 1, Maschine) → document.json
+"""REQ-903: End-to-End – PDF → Entwurf (Stufe 1, Maschine) → document.json
 (Stufe 2, Facharbeit, hier simuliert) → Kandidaten mit Fundstelle
-(bestehende Ingest-Pipeline M2 unverändert, ADR-0006)."""
+(bestehende Ingest-Pipeline M2 unverändert, ADR-0010)."""
 
 import json
 from pathlib import Path
@@ -11,7 +11,7 @@ from sni.ingest.pipeline import ingest_document
 from tests.conftest import CONCEPT_A, CONCEPT_B, clauses_of, load_draft, source_of, write_norm_pdf
 
 
-def test_req803_extract_then_ingest_candidates(catalog_store: ConceptStore, tmp_path: Path) -> None:
+def test_req903_extract_then_ingest_candidates(catalog_store: ConceptStore, tmp_path: Path) -> None:
     norms = tmp_path / "norms"
     write_norm_pdf(
         "syn1-2020",
