@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sni:status",
+  "type": "object",
+  "required": ["version", "mode", "port", "documents", "summary", "disclaimer"],
+  "properties": {
+    "version": {"type": "string"},
+    "mode": {"enum": ["window", "browser", "headless"]},
+    "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+    "login": {
+      "type": ["object", "null"],
+      "description": "M8.2: Login-Sitzung (provider, customer, device_id); null = nicht eingeloggt"
+    },
+    "ollama": {
+      "type": ["object", "null"],
+      "description": "M8.4: Ollama-Status (erreichbar, aktives Modell); null = noch nicht geprüft"
+    },
+    "documents": {"type": "integer", "minimum": 0, "description": "Zahl der analysierten lokalen Dokumente (M8.3)"},
+    "summary": {"type": "string", "description": "Status-Text für die UI-Statuszeile (semantisch klassifiziert in app.js)"},
+    "disclaimer": {"type": "string", "description": "G6: jede fachliche API-Antwort trägt den Disclaimer"}
+  }
+}

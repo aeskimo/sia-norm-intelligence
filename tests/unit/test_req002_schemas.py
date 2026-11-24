@@ -17,6 +17,7 @@ EXPECTED = {
     "project_values.schema.json",
     "rule.schema.json",
     "source_reference.schema.json",
+    "status.schema.json",
 }
 
 
