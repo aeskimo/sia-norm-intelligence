@@ -8,8 +8,9 @@
   const params = new URLSearchParams(window.location.search);
   const siaToken = params.get("sia_token");
   if (siaToken) {
-    // Token aus der Adressleiste entfernen (bleibt nur im Speicher)
-    window.history.replaceState({}, "", window.location.pathname);
+    // Token aus der Adressleiste entfernen (bleibt nur im Speicher);
+    // den Hash (Deep Link, z. B. #/norms) erhalten.
+    window.history.replaceState({}, "", window.location.pathname + window.location.hash);
   }
 
   function apiFetch(path, options) {
