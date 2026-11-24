@@ -33,6 +33,57 @@ HTML = (
 )
 
 
+def _diagnose() -> None:
+    """Best-effort-Diagnose, wenn das Shown-Event nie kommt (CI: Xvfb/GTK).
+
+    Zeigt, wo der Main-Thread steht (Init-Hang vs. laufender Main-Loop)
+    und ob WebKit-Prozesse existieren — das entscheidet über die
+    Root-Cause-Klassifikation.
+    """
+    try:
+        import sys
+        import traceback
+
+        frames = sys._current_frames()
+        main = next((t for t in threading.enumerate() if t.name == "MainThread"), None)
+        if main is not None and main.ident in frames:
+            stack = traceback.format_stack(frames[main.ident])
+            print(
+                "[diag] Main-Thread-Stack (letzte Frames):\n" + "".join(stack[-8:]),
+                file=sys.stderr,
+                flush=True,
+            )
+    except Exception as e:
+        print("[diag] Stack-Dump fehlgeschlagen:", repr(e), file=sys.stderr, flush=True)
+    try:
+        import subprocess
+
+        out = subprocess.run(
+            ["pgrep", "-af", "WebKitWebProcess|WebKitNetworkProcess"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        procs = (out.stdout or "").strip()
+        print("[diag] WebKit-Prozesse:", procs or "(keine)", file=sys.stderr, flush=True)
+    except Exception as e:
+        print("[diag] pgrep fehlgeschlagen:", repr(e), file=sys.stderr, flush=True)
+    try:
+        from gi.repository import Gtk
+
+        toplevels = Gtk.Window.list_toplevels()
+        print(f"[diag] Gtk-Top-Level-Fenster: {len(toplevels)}", file=sys.stderr, flush=True)
+        for w in toplevels:
+            print(
+                f"[diag]   {type(w).__name__} visible={w.get_visible()} "
+                f"mapped={w.get_mapped()} title={w.get_title()!r}",
+                file=sys.stderr,
+                flush=True,
+            )
+    except Exception as e:
+        print("[diag] Gtk-Inspektion nicht möglich:", repr(e), file=sys.stderr, flush=True)
+
+
 def _auto_close(window) -> None:
     """CI-Auto-Schliessen: Shown-Event abwarten, dann destroy + Backstop.
 
@@ -54,7 +105,12 @@ def _auto_close(window) -> None:
         backstop.start()
         window.destroy()
     else:
-        print("[packaging-smoke] Fenster wurde nicht angezeigt → os._exit(1)", file=sys.stderr)
+        print(
+            "[packaging-smoke] Fenster wurde nicht angezeigt → Diagnose + os._exit(1)",
+            file=sys.stderr,
+            flush=True,
+        )
+        _diagnose()
         os._exit(1)
 
 
