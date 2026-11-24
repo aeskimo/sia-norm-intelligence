@@ -8,6 +8,7 @@ on:
 jobs:
   check:
     # M8.2 DoD: make check auf 3 OS (nicht nur Linux).
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -27,6 +28,7 @@ jobs:
     # REQ-817: minimale App (Hello Window) wird auf 3 OS gebaut und gestartet
     # (PyInstaller + pywebview; WKWebView/WebView2/WebKit2GTK). Das
     # Packaging-Risiko fällt so in Woche 1 auf, nicht nach fünf Feature-Steps.
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -71,7 +73,18 @@ jobs:
           WEBKIT_DISABLE_COMPOSITING_MODE: "1"
         run: |
           if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            xvfb-run --auto-servernum dist/sia-hello-window
+            # timeout: ein Prozess-Hang darf den Job nicht 15 min blockieren.
+            # Exit 124 = nicht beendet → Prozess-Tree dumpen (Diagnose).
+            set +e
+            timeout 90 xvfb-run --auto-servernum dist/sia-hello-window
+            rc=$?
+            set -e
+            if [ "$rc" -eq 124 ]; then
+              echo "::error::Hello Window hat sich nicht innerhalb von 90 s beendet (Hang)"
+              ps auxf || true
+              exit 1
+            fi
+            exit "$rc"
           else
             ./dist/sia-hello-window
           fi
