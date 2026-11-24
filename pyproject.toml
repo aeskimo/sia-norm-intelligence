@@ -16,6 +16,9 @@ dependencies = [
     "pypdf>=5.0",
     "python-multipart>=0.0.9",
     "pywebview>=5.0",
+    # Pin mit Obergrenze: Single-DES-Klasse ist in neueren Versionen entfernt
+    # (09_CONSUMER_APP.md §10.5, ADR-0007); TripleDES-24-Byte-Pfad >=46.
+    "cryptography>=46,<51",
 ]
 
 [project.optional-dependencies]

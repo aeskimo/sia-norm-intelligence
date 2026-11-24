@@ -402,11 +402,18 @@ Login-Request, danach im Keyring bzw. verworfen (Zeroing).
 
 Bekannt schwach, aber einseitig nicht änderbar (shop.sia.ch);
 dokumentiert in `sni/shop/decrypt.py`. App-seitige Krypto bleibt
-AES-256-GCM. **Risiko:** `cryptography` markiert (3-)DES in neueren
-Versionen als *decrepit* → Version wird **gepinnt**, und ein
-Known-Answer-Test mit Werten aus der Java-Implementierung (bekannte
-statische Key/IV, synthetische `.mro`/`.srd`-Fixtures — G4: keine
-echten Lizenzdateien) sichert die Protokoll-Kompatibilität (REQ-801).
+AES-256-GCM. **Auflösendes Ergebnis (2026-11-24, REQ-801):**
+pyca/cryptography bietet keinen öffentlichen Single-DES (Klasse in
+neueren Versionen entfernt, auf 50.0.2 verifiziert); der Port nutzt
+die dokumentierte Äquivalente `TripleDES` mit 24-Byte-Schlüssel
+`k + k + k` (EDE mit identischen Teilkeys ≡ Single DES) — nicht
+betroffen von der 45.0.0er-Deprecation für 8/16-Byte-Keys.
+`cryptography>=46,<51` ist **gepinnt** (Obergrenze gegen künftige
+TripleDES-Entfernung). Protokoll-Kompatibilität sichert der
+Known-Answer-Test mit Java-Referenzwerten (Vektoren erzeugt von
+`SrdKeyUnwrapper`/`DES/CBC/PKCS5Padding` unter JDK 25, synthetische
+`.mro`/`.srd`-Fixtures — G4: keine echten Lizenzdateien) — grün auf
+cryptography 50.0.2 ohne Warnungen (`test_req801_des_kat.py`).
 
 ## 11. Cross-Platform
 
@@ -489,7 +496,7 @@ im Java-Projekt (Screenshot + nicht-blank).
 | PDF-Extraktion < Java-Baseline (Semantik-Export bröckelt) | Fixture-Gate in M8.3 mit pypdfium2 **und** pdfminer.six; Fallback: Verlierer-Engine tauschen → Poppler-Option → Re-Decision (OQ-010) |
 | 8 von 9 Pilot-PDFs ohne Textschicht (reine Vektorgrafik, 0 extrahierbare Zeichen; nur `sia101-2020` liefert Text) | M9-Pilot-Befund 2026-11-23 (OQ-015, ADR-0010): REQ-804 (M8.3) ist für diese 8 Normen blockiert — weder pypdfium2 noch pdfminer.six kompensieren eine fehlende Textschicht; OCR ist v1-ausserhalb (ADR-0010). Offene User-Entscheidung OQ-015 (SIA-Neuexport mit Textschicht vs. OCR-Strategie). M8.2 und M8.4–M8.5 sind davon nicht betroffen |
 | SIA-Protokoll-Drift (SOAP, DES, Timeouts) | Protokoll-Tests mit Mock (Java-Verhalten referenziert); Retry-Logik 1:1 (1× nach 500 ms); DES per Known-Answer-Test gegen Java-Werte gesichert (REQ-801) |
-| `cryptography` macht (3-)DES decrepit (Versionsbruch) | Version pinnen; Known-Answer-Test (REQ-801); Fallback-Entscheidung per ADR, falls der Pin untragbar wird |
+| `cryptography` entfernt (3-)DES (auf 50.x verifiziert: Single-DES-Klasse weg) | **Gelöst (REQ-801):** `TripleDES(k+k+k)` mit 24-Byte-Key ≡ Single DES, kein Deprecation-Pfad; `cryptography>=46,<51` gepinnt; KAT gegen Java-Referenzwerte grün (2026-11-24) |
 | Keyring ohne Secret-Service (Linux) | File-Fallback + sichtbare Warnung; Doku |
 | Keyring-Migration Windows/Linux (Java schrieb nur macOS) | Expliziter 3-OS-Test in M8.3 (REQ-802); wo kein Java-Eintrag existiert, ist nichts zu migrieren — dokumentiert statt angenommen |
 | Packaging (PyInstaller + pywebview, WebView2/WebKitGTK, Signing) | Früh-Test M8.1 (REQ-817, 3-OS-CI, Hello Window) statt Erst-Test in M8.6; Signing/Notarization = OQ-014 |
