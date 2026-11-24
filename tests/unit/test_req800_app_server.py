@@ -58,7 +58,7 @@ def test_req800_status_returns_app_state(app_server: TestClient) -> None:
     assert data["login"] is None  # M8.2
     assert data["ollama"] is None  # M8.4
     assert data["documents"] == 0
-    assert data["summary"] == "Bereit."
+    assert data["summary"] == "Bereit. Bitte im Normenkatalog einloggen."
     assert data["disclaimer"] == DISCLAIMER
 
 

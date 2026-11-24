@@ -189,6 +189,86 @@ th {
 
 tbody tr { border-bottom: 1px solid var(--hairline); }
 
+/* --- Formulare (M8.2 Login) ------------------------------------------------- */
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 14px;
+  margin-bottom: 8px;
+}
+
+.form label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.form label.checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+  margin: 2px 0 4px;
+}
+
+input,
+select {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 6px 8px;
+  color: var(--text);
+  background: var(--content);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-btn);
+}
+
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 1px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.search {
+  width: 100%;
+  margin: 6px 0 10px;
+}
+
+.btn-sm {
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.card.dimmed { opacity: 0.65; }
+
+.error-text { color: var(--error); }
+
+.table-wrap { overflow-x: auto; }
+
+.row-actions { white-space: nowrap; }
+
+.pdf-frame {
+  width: 100%;
+  height: 480px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-btn);
+  background: var(--content);
+}
+
 /* Dark-Mode-Feintuning */
 @media (prefers-color-scheme: dark) {
   .btn-accent { color: #0A0A0A; }

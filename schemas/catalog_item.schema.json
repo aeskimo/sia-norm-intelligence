@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sni:catalog_item",
+  "description": "Katalogeintrag der aktuellen Lizenz-Sitzung (M8.2, 09_CONSUMER_APP.md §6.2; ohne Zugangsdaten, Schlüssel oder Norminhalt, G4).",
+  "type": "object",
+  "required": [
+    "product_id",
+    "number",
+    "title",
+    "description",
+    "keywords",
+    "language",
+    "year",
+    "revision",
+    "remote_filename",
+    "view_allowed",
+    "print_allowed",
+    "copy_allowed"
+  ],
+  "properties": {
+    "product_id": {"type": "string", "minLength": 1},
+    "number": {"type": "string", "description": "z. B. SIA 101"},
+    "title": {"type": "string"},
+    "description": {"type": "string"},
+    "keywords": {"type": "string"},
+    "language": {"type": "string", "description": "Großbuchstaben, z. B. DE/FR/IT/EN"},
+    "year": {"type": "string"},
+    "revision": {"type": "string"},
+    "valid_from": {"type": ["string", "null"], "format": "date"},
+    "valid_until": {"type": ["string", "null"], "format": "date"},
+    "remote_filename": {"type": "string", "description": "Dateiname der .srd-Quelle"},
+    "view_allowed": {"type": "boolean", "description": "Lizenz-Recht: Ansicht"},
+    "print_allowed": {"type": "boolean", "description": "Lizenz-Recht: Drucken"},
+    "copy_allowed": {"type": "boolean", "description": "Lizenz-Recht: Kopieren"}
+  }
+}

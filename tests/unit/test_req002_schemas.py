@@ -9,10 +9,13 @@ DRAFT_2020_12 = "https://json-schema.org/draft/2020-12/schema"
 
 EXPECTED = {
     "answer.schema.json",
+    "catalog_item.schema.json",  # M8.2 (09 §6.2)
     "check_result.schema.json",
     "concept.schema.json",
     "document_draft.schema.json",  # M9, ADR-0010
     "gap_report.schema.json",
+    "job.schema.json",  # M8.2 (09 §6.2)
+    "local_document.schema.json",  # M8.2 (09 §6.2)
     "norm_statement.schema.json",
     "project_values.schema.json",
     "rule.schema.json",

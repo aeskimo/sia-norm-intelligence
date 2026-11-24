@@ -103,9 +103,15 @@ class DownloadService:
         with self._lock:
             return list(self._jobs.values())
 
-    def close(self) -> None:
-        """Stoppt die Queue und wartet auf den laufenden Job (App-Logout/Ende)."""
-        self._executor.shutdown(wait=True)
+    def close(self, wait: bool = True, cancel_futures: bool = False) -> None:
+        """Stoppt die Queue.
+
+        ``wait=True`` (Default): wartet auf den laufenden Job (App-Ende).
+        ``cancel_futures=True`` (App-Logout): wartet nicht und bricht
+        eingereihte Jobs ab — ein laufender Job endet selbstständig, weil
+        die geschlossene Session die Download-Aufrufe wirft.
+        """
+        self._executor.shutdown(wait=wait, cancel_futures=cancel_futures)
 
     # ------------------------------------------------------------------ intern
 

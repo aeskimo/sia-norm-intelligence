@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from sni.shop.catalog import CatalogStore
 from sni.shop.catalog_xml import parse_license_catalog
 from sni.shop.decrypt import decrypt_mro, extract_individual_key_and_iv, srd_decrypt_document
-from sni.shop.models import LicenseSink, LoginResult
+from sni.shop.models import LicenseSink, LoginResult, LoginStatus
 from sni.shop.providers import SIA
 from sni.shop.soap import SiaSoapClient
 from sni.shop.soap import _safe as _mask_diagnostics
@@ -35,12 +35,18 @@ def _production_client() -> SiaSoapClient:
 
 @dataclass(frozen=True, slots=True)
 class LoginOutcome:
-    """Ergebnis des Logins (Java: ``LoginOutcome``)."""
+    """Ergebnis des Logins (Java: ``LoginOutcome``).
+
+    ``status`` ist eine App-Erweiterung (kein Java-Feld): der exakte
+    Protokollstatus für die App-API (09 §6.2: Fehler-Codes 1:1, z. B.
+    ``Fail_Wrong_PWD``); bei Protokollfehlern ``None``.
+    """
 
     success: bool
     message: str
     catalog_size: int
     session: LicenseSession | None
+    status: LoginStatus | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,7 +165,7 @@ class SiaProductService:
             )
             if not result.is_success:
                 credentials.close()
-                return LoginOutcome(False, _safe(result), 0, None)
+                return LoginOutcome(False, _safe(result), 0, None, result.status)
             raw = sink.bytes
             if raw is None:
                 raise ValueError("Lizenzbytes nicht vorhanden")
@@ -169,7 +175,11 @@ class SiaProductService:
             self._catalog.replace_all(parsed.documents)
             message = "OK" if not parsed.warnings else f"{len(parsed.warnings)} Katalogwarnungen"
             return LoginOutcome(
-                True, message, self._catalog.size(), LicenseSession(credentials, key, iv)
+                True,
+                message,
+                self._catalog.size(),
+                LicenseSession(credentials, key, iv),
+                result.status,
             )
         except Exception as exc:
             credentials.close()

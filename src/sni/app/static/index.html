@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; frame-src 'self' blob:">
   <title>SIA-Normenassistent</title>
   <link rel="stylesheet" href="/static/sia.css">
 </head>
@@ -24,13 +24,44 @@
     <main id="view">
       <section class="view" id="view-catalog" data-view="catalog">
         <h1>Normenkatalog</h1>
-        <div class="card">
+        <div class="card" id="login-card">
           <h2 class="card-title">Login</h2>
-          <p class="muted">In M8.2: Provider, Kundennummer, Passwort, Device-ID, „Merken“.</p>
+          <form id="login-form" class="form">
+            <div class="form-grid">
+              <label>Provider
+                <select id="login-provider">
+                  <option value="sia">SIA (shop.sia.ch)</option>
+                  <option value="vss">VSS (www.vss.ch)</option>
+                  <option value="phgr">phGR (doksi.exigo.ch)</option>
+                  <option value="swki">SWKI (shop.swki.ch)</option>
+                </select>
+              </label>
+              <label>Kundennummer / Benutzername
+                <input id="login-customer" autocomplete="username" required>
+              </label>
+              <label>Passwort
+                <input id="login-password" type="password" autocomplete="current-password" required>
+              </label>
+              <label>Device-ID
+                <input id="login-device" autocomplete="off" required>
+              </label>
+            </div>
+            <label class="checkbox">
+              <input id="login-remember" type="checkbox">
+              Zugangsdaten merken (OS-Keyring)
+            </label>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-accent" id="login-button">Einloggen</button>
+              <button type="button" class="btn" id="logout-button" hidden>Abmelden</button>
+            </div>
+            <p id="login-message" class="muted" aria-live="polite"></p>
+          </form>
         </div>
-        <div class="card">
+        <div class="card" id="catalog-card">
           <h2 class="card-title">Katalog</h2>
-          <p class="muted">In M8.2: Normen-Tabelle mit Statusfilter.</p>
+          <p class="muted" id="catalog-hint">Bitte zuerst einloggen.</p>
+          <input id="catalog-search" class="search" placeholder="Suche: Nummer, Titel, Stichwort" hidden>
+          <div id="catalog-results" class="table-wrap"></div>
         </div>
         <div class="status-row" aria-live="polite"><span class="status-dot neutral" aria-hidden="true"></span><span class="status-text">Bereit.</span></div>
       </section>
@@ -39,7 +70,13 @@
         <h1>Meine Normen</h1>
         <div class="card">
           <h2 class="card-title">Lokale Dokumente</h2>
-          <p class="muted">In M8.2/803: lokale Dokumente mit Status und Aktionen (Öffnen, Analysieren, Entfernen).</p>
+          <p class="muted" id="norms-hint">Keine lokalen Dokumente. Nach dem Download erscheint die Norm hier.</p>
+          <div id="norms-results" class="table-wrap"></div>
+          <p id="jobs-line" class="muted" aria-live="polite"></p>
+        </div>
+        <div class="card" id="pdf-card" hidden>
+          <h2 class="card-title" id="pdf-title">PDF-Vorschau</h2>
+          <iframe id="pdf-frame" class="pdf-frame" title="PDF-Vorschau"></iframe>
         </div>
         <div class="status-row" aria-live="polite"><span class="status-dot neutral" aria-hidden="true"></span><span class="status-text">Bereit.</span></div>
       </section>

@@ -39,6 +39,11 @@ class CatalogStore:
         with self._lock:
             return len(self._by_id)
 
+    def all(self) -> list[StandardDocument]:
+        """Alle Produkte in Einfügeordnung (App-Erweiterung, 09 §6.2: Katalog-Tabelle)."""
+        with self._lock:
+            return list(self._by_id.values())
+
     def search(
         self,
         text: str | None,

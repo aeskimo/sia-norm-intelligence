@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sni:job",
+  "description": "Async-Job der Consumer-App (M8.2, 09_CONSUMER_APP.md §6.2); eine Queue, max. 1 paralleler Job, Status per Polling (UI alle 2 s).",
+  "type": "object",
+  "required": ["id", "kind", "status"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "kind": {"enum": ["download", "analyze", "pull"], "description": "analyze/pull ab M8.3/M8.4"},
+    "document_id": {"type": ["string", "null"], "description": "Produkt-ID des zugehörigen Dokuments"},
+    "status": {"enum": ["queued", "running", "done", "error"]},
+    "progress": {"type": ["string", "null"], "description": "Freitext-Fortschritt (deutsch)"},
+    "error": {"type": ["string", "null"], "description": "Fehlermeldung (ohne Schlüsselmaterial, G4)"}
+  }
+}

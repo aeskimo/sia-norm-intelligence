@@ -22,6 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from sni.api.main import create_app
 from sni.app.api import router as app_router
 from sni.app.security import LoopbackSecurityMiddleware
+from sni.app.shop import ShopState
 
 STATIC_DIR = Path(__file__).parent / "static"
 HOST = "127.0.0.1"  # G4: nur Loopback
@@ -35,11 +36,17 @@ def build_app(
     sia_token: str | None = None,
     mode: str = "window",
     port: int = 0,
+    shop: ShopState | None = None,
 ) -> FastAPI:
-    """Kern-API + Static-UI + App-Router; mit Token: Sicherheitsschicht (REQ-816)."""
+    """Kern-API + Static-UI + App-Router; mit Token: Sicherheitsschicht (REQ-816).
+
+    ``shop`` ist der App-Shop-Zustand (M8.2, Default: frische Instanz);
+    Tests injizieren eine Instanz mit Fake-Client.
+    """
     app = create_app(db_path=db_path, knowledge_dir=knowledge_dir, rules_dir=rules_dir)
     app.state.app_mode = mode
     app.state.app_port = port
+    app.state.shop = shop if shop is not None else ShopState()
 
     @app.get("/")
     def index() -> FileResponse:
