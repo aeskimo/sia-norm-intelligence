@@ -27,3 +27,8 @@ data/extracted/*.json
 
 # Lizenzierte Normtexte – nie ins Repo (Guardrail G4)
 data/norms/
+
+# PyInstaller (REQ-817; Build-Artefakte, regenerierbar in der CI)
+build/
+dist/
+*.spec
