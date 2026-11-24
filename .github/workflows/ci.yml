@@ -7,7 +7,12 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # M8.2 DoD: make check auf 3 OS (nicht nur Linux).
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -32,19 +37,36 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: "System dependencies (Linux: WebKit2GTK, Xvfb)"
+      - name: "System dependencies (Linux: WebKit2GTK, Typelibs, PyGObject-Build, Xvfb)"
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-0 libgtk-3-0 xvfb
+          sudo apt-get install -y libwebkit2gtk-4.1-0 libgtk-3-0 \
+            gir1.2-gtk-3.0 gir1.2-webkit2-4.1 xvfb \
+            libgirepository-2.0-dev libcairo2-dev pkg-config
       - name: Install build dependencies
-        run: pip install pywebview pyinstaller
+        run: |
+          pip install pywebview pyinstaller
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            # pywebview-GTK-Backend: gi (PyGObject) muss in der Build-Umgebung
+            # importierbar sein, damit PyInstaller es sammeln kann. Sdist-Build;
+            # <3.59, weil 3.59 GLib >= 2.84 braucht (ubuntu-latest = 2.80).
+            pip install "PyGObject<3.59"
+          fi
       - name: Build hello window (PyInstaller onefile)
-        run: pyinstaller --onefile --name sia-hello-window packaging/hello_window.py
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            # gi wird nicht automatisch von PyInstaller erfasst.
+            pyinstaller --onefile --collect-all gi --name sia-hello-window packaging/hello_window.py
+          else
+            pyinstaller --onefile --name sia-hello-window packaging/hello_window.py
+          fi
       - name: Start hello window (auto-close nach 5 s)
         shell: bash
         env:
           SIA_HELLO_WINDOW_SECONDS: "5"
+          # WebKit2GTK ohne GPU (Runner): Compositing abschalten, sonst Crashes.
+          WEBKIT_DISABLE_COMPOSITING_MODE: "1"
         run: |
           if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
             xvfb-run --auto-servernum dist/sia-hello-window
