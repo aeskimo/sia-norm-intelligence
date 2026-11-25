@@ -4,10 +4,13 @@ nie direkt als `approved` (Guardrail G3)."""
 import json
 from pathlib import Path
 
+import pytest
+
 from sni.catalog.snapshot import load_snapshot
 from sni.catalog.store import ConceptStore
 from sni.ingest.cli import main
-from sni.ingest.pipeline import DEFAULT_QUEUE_DIR, ROOT
+from sni.ingest.pipeline import default_queue_dir
+from sni.state import paths as state_paths
 from tests.conftest import load_synthetic_norm, make_snapshot
 
 
@@ -105,5 +108,11 @@ def test_req202_conflicting_queue_file_rejected_atomically(tmp_path: Path) -> No
     assert sorted(p.name for p in queue.glob("*.json")) == ["sia_statement_syn1-2020_3.1_1.json"]
 
 
-def test_req202_default_queue_dir_is_review_queue() -> None:
-    assert DEFAULT_QUEUE_DIR == ROOT / "data" / "review_queue"
+def test_req202_default_queue_dir_is_review_queue(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: ohne ``SIA_CORE_DATA_DIR`` = ``<repo>/data/review_queue``
+    (nicht ``src/data/``); M8.6: call-time-Auflösung über ``core_data_dir()``."""
+    monkeypatch.delenv("SIA_CORE_DATA_DIR", raising=False)
+    root = Path(state_paths.__file__).resolve().parents[3]
+    assert default_queue_dir() == root / "data" / "review_queue"

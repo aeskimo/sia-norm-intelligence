@@ -41,10 +41,18 @@ from jsonschema.exceptions import ValidationError
 
 from sni.catalog.store import ConceptStore
 from sni.core.schemas import load_schema, make_validator
+from sni.state.paths import core_data_dir
 
-ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_NORMS_DIR = ROOT / "data" / "norms"
-DEFAULT_QUEUE_DIR = ROOT / "data" / "review_queue"
+
+def default_norms_dir() -> Path:
+    """``SIA_CORE_DATA_DIR``/norms, sonst ``<repo>/data/norms`` (call-time, M8.6)."""
+    return core_data_dir() / "norms"
+
+
+def default_queue_dir() -> Path:
+    """``SIA_CORE_DATA_DIR``/review_queue, sonst ``<repo>/data/review_queue``."""
+    return core_data_dir() / "review_queue"
+
 
 _SAFE_ID_RE = re.compile(r"[A-Za-z0-9._-]+")
 _GAP_FILE_RE = re.compile(r"GAP-\d{4}")
@@ -82,11 +90,13 @@ class _Unit:
     laufnr: int
 
 
-def load_document(norm_id: str, norms_dir: Path = DEFAULT_NORMS_DIR) -> dict[str, object]:
+def load_document(norm_id: str, norms_dir: Path | None = None) -> dict[str, object]:
     """Lädt ``data/norms/<norm-id>/document.json`` (lokaler Mount, G4).
 
     Die Norm-ID im Dokument muss zum Mount-Verzeichnis passen (Fundstelle).
     """
+    if norms_dir is None:
+        norms_dir = default_norms_dir()
     if not _SAFE_ID_RE.fullmatch(norm_id) or ".." in norm_id:
         raise IngestError(
             [f"Ungültige Norm-ID {norm_id!r} (erlaubt: Buchstaben, Ziffern, '.', '_', '-')"]

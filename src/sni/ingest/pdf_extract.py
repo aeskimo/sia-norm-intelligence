@@ -48,7 +48,7 @@ from pypdf import PageObject, PdfReader
 from pypdf.generic import IndirectObject
 
 from sni.core.schemas import make_validator
-from sni.ingest.pipeline import _SAFE_ID_RE, DEFAULT_NORMS_DIR
+from sni.ingest.pipeline import _SAFE_ID_RE, default_norms_dir
 
 SOURCE_FILENAME = "document.pdf"
 DRAFT_FILENAME = "document.draft.json"
@@ -125,8 +125,10 @@ class _Candidate:
     accepted: bool = False
 
 
-def extract_pdf(norm_id: str, norms_dir: Path = DEFAULT_NORMS_DIR) -> ExtractResult:
+def extract_pdf(norm_id: str, norms_dir: Path | None = None) -> ExtractResult:
     """Liest ``document.pdf`` und schreibt ``document.draft.json`` (atomar, G4)."""
+    if norms_dir is None:
+        norms_dir = default_norms_dir()
     if not _SAFE_ID_RE.fullmatch(norm_id) or ".." in norm_id:
         raise PdfExtractError(
             [f"Ungültige Norm-ID {norm_id!r} (erlaubt: Buchstaben, Ziffern, '.', '_', '-')"]

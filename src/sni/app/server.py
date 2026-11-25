@@ -37,12 +37,21 @@ def build_app(
     mode: str = "window",
     port: int = 0,
     shop: ShopState | None = None,
+    core_data_dir: Path | None = None,
 ) -> FastAPI:
     """Kern-API + Static-UI + App-Router; mit Token: Sicherheitsschicht (REQ-816).
 
     ``shop`` ist der App-Shop-Zustand (M8.2, Default: frische Instanz);
     Tests injizieren eine Instanz mit Fake-Client.
+
+    ``core_data_dir`` (M8.6, REQ-813): schreibbarer Kerndaten-Mount der
+    frozen App (``<user_data_dir>/data``); setzt die Core-Defaults für
+    Katalog-DB, Wissensbasis und Regeln.
     """
+    if core_data_dir is not None:
+        db_path = db_path or core_data_dir / "catalog" / "catalog.db"
+        knowledge_dir = knowledge_dir or core_data_dir / "extracted"
+        rules_dir = rules_dir or core_data_dir / "rules"
     app = create_app(db_path=db_path, knowledge_dir=knowledge_dir, rules_dir=rules_dir)
     app.state.app_mode = mode
     app.state.app_port = port

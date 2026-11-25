@@ -17,9 +17,11 @@ import os
 import sys
 import threading
 import webbrowser
+from pathlib import Path
 
 import uvicorn
 
+from sni.app import bootstrap
 from sni.app.security import new_session_token
 from sni.app.server import HOST, build_app, pick_free_port, start_server_thread, ui_url
 from sni.state.migrate import migrate
@@ -56,22 +58,22 @@ def resolve_headless_port(port: int | None) -> int:
     return 8000
 
 
-def run_headless(args: argparse.Namespace) -> int:
+def run_headless(args: argparse.Namespace, core_data_dir: Path | None = None) -> int:
     """Headless-Modus: uvicorn im Main-Thread (Signalhandling)."""
     port = resolve_headless_port(args.port)
     token = new_session_token()
-    app = build_app(mode="headless", port=port, sia_token=token)
+    app = build_app(mode="headless", port=port, sia_token=token, core_data_dir=core_data_dir)
     print(f"SIA-Normenassistent API: http://{HOST}:{port}", flush=True)
     print(f"sia_token: {token}", flush=True)
     uvicorn.run(app, host=HOST, port=port, log_level="warning")
     return 0
 
 
-def run_browser(args: argparse.Namespace) -> int:
+def run_browser(args: argparse.Namespace, core_data_dir: Path | None = None) -> int:
     """Browser-Modus: Server im Hintergrund-Thread, UI im Standardbrowser."""
     port = pick_free_port()
     token = new_session_token()
-    app = build_app(mode="browser", port=port, sia_token=token)
+    app = build_app(mode="browser", port=port, sia_token=token, core_data_dir=core_data_dir)
     server = start_server_thread(app, port)
     print(f"SIA-Normenassistent UI: {ui_url(port, token)}", flush=True)
     webbrowser.open(ui_url(port, token))
@@ -81,11 +83,11 @@ def run_browser(args: argparse.Namespace) -> int:
     return 0
 
 
-def run_window(args: argparse.Namespace) -> int:
+def run_window(args: argparse.Namespace, core_data_dir: Path | None = None) -> int:
     """Fenster-Modus: pywebview im Main-Thread (macOS), Server im Hintergrund-Thread."""
     port = pick_free_port()
     token = new_session_token()
-    app = build_app(mode="window", port=port, sia_token=token)
+    app = build_app(mode="window", port=port, sia_token=token, core_data_dir=core_data_dir)
     server = start_server_thread(app, port)
     print(f"SIA-Normenassistent UI: {ui_url(port, token)}", flush=True)
     try:
@@ -100,14 +102,31 @@ def run_window(args: argparse.Namespace) -> int:
     return 0
 
 
+def _frozen_core_data_dir() -> Path | None:
+    """M8.6 (REQ-813): frozen App → schreibbaren Kerndaten-Mount säumen.
+
+    Setzt ``SIA_CORE_DATA_DIR`` (Call-time-Defaults von Review/Ingest) und
+    liefert das Verzeichnis für ``build_app`` (Katalog/Wissensbasis/Regeln).
+    Dev-Modus: None (Kerndaten = ``<repo>/data``).
+    """
+    if not bootstrap.frozen():
+        return None
+    core = bootstrap.core_data_dir()
+    os.environ["SIA_CORE_DATA_DIR"] = str(core)
+    imported = bootstrap.seed_core_data(core, bootstrap.bundle_data_dir())
+    print(f"Kerndaten: {core} ({imported} neue Concepts)", flush=True)
+    return core
+
+
 def main(argv: list[str] | None = None) -> int:
     """Einstiegspunkt für ``python -m sni.app``."""
     args = parse_args(argv)
     report = migrate()  # Java-Stand → Python-Zielzustand, vor dem Server (ADR-0011 Punkt 7)
     if report.workspace_problem is not None:
         print(f"Hinweis: {report.workspace_problem}", file=sys.stderr)
+    core = _frozen_core_data_dir()
     if args.headless:
-        return run_headless(args)
+        return run_headless(args, core_data_dir=core)
     if args.browser:
-        return run_browser(args)
-    return run_window(args)
+        return run_browser(args, core_data_dir=core)
+    return run_window(args, core_data_dir=core)

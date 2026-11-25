@@ -19,7 +19,6 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from sni.app import api as app_api
 from sni.app.server import build_app
 from sni.app.shop import ShopState
 from sni.catalog.snapshot import load_snapshot
@@ -244,9 +243,8 @@ def _build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[TestClient,
     monkeypatch.setenv("SIA_FAKE_KEYCHAIN", str(tmp_path / "keychain"))
     monkeypatch.delenv("SIA_STATE_KEY_B64", raising=False)
     monkeypatch.delenv("GIBB_API_KEY", raising=False)
-    # Hermetik: Norm-Mount und Review-Queue in den tmp-Pfad (statt Repo-data/).
-    monkeypatch.setattr(app_api, "DEFAULT_NORMS_DIR", tmp_path / "norms")
-    monkeypatch.setattr(app_api, "DEFAULT_QUEUE_DIR", tmp_path / "queue")
+    # Hermetik: Core-Daten-Mount in den tmp-Pfad (statt Repo-data/, M8.6).
+    monkeypatch.setenv("SIA_CORE_DATA_DIR", str(tmp_path))
     client = FakeSoapClient(
         login_result_ok(),
         make_mro(LICENSE_XML_2020),
@@ -375,7 +373,7 @@ def test_req810_api_happy_path_exports_and_ingests(
     document_file = tmp_path / "norms" / "sia101-2020" / "document.json"
     assert document_file.is_file()
     # Ingest in-process: Kandidaten stehen in der (gepatchten) Review-Queue
-    queue_files = sorted((tmp_path / "queue").glob("*.json"))
+    queue_files = sorted((tmp_path / "review_queue").glob("*.json"))
     assert len(queue_files) == 2
     queue_candidate = json.loads(queue_files[0].read_text(encoding="utf-8"))
     assert queue_candidate["review_status"] == "candidate"

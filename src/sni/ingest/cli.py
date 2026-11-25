@@ -9,9 +9,9 @@ from pathlib import Path
 from sni.catalog.store import ConceptStore
 from sni.ingest.pdf_extract import PdfExtractError, extract_pdf
 from sni.ingest.pipeline import (
-    DEFAULT_NORMS_DIR,
-    DEFAULT_QUEUE_DIR,
     IngestError,
+    default_norms_dir,
+    default_queue_dir,
     ingest_document,
     load_document,
 )
@@ -34,16 +34,18 @@ def main(
         if len(args) != 2:
             print("Verwendung: python -m sni.ingest extract <norm-id>")
             return 2
-        return _run_extract(args[1], norms_dir if norms_dir is not None else DEFAULT_NORMS_DIR)
+        return _run_extract(args[1], norms_dir if norms_dir is not None else default_norms_dir())
     if len(args) != 1:
         print("Verwendung: python -m sni.ingest <norm-id> | python -m sni.ingest extract <norm-id>")
         return 2
     norm_id = args[0]
     store = ConceptStore(catalog_db if catalog_db is not None else DEFAULT_CATALOG_DB)
     try:
-        document = load_document(norm_id, norms_dir if norms_dir is not None else DEFAULT_NORMS_DIR)
+        document = load_document(
+            norm_id, norms_dir if norms_dir is not None else default_norms_dir()
+        )
         result = ingest_document(
-            document, store, queue_dir if queue_dir is not None else DEFAULT_QUEUE_DIR
+            document, store, queue_dir if queue_dir is not None else default_queue_dir()
         )
     except IngestError as exc:
         for line in exc.report:

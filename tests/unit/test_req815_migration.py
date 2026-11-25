@@ -236,7 +236,7 @@ def test_req815_launcher_runs_migration_before_server(
         calls.append("migrate")
         return MigrationReport(False, None, 0, 0)
 
-    def fake_headless(args: object) -> int:
+    def fake_headless(args: object, core_data_dir: object = None) -> int:
         calls.append("server")
         return 0
 

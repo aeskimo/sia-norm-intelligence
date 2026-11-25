@@ -27,10 +27,22 @@ from jsonschema.exceptions import ValidationError
 from jsonschema.validators import Draft202012Validator
 
 from sni.core.schemas import make_validator
+from sni.state.paths import core_data_dir
 
-ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_QUEUE_DIR = ROOT / "data" / "review_queue"
-DEFAULT_EXTRACTED_DIR = ROOT / "data" / "extracted"
+
+def default_queue_dir() -> Path:
+    """``SIA_CORE_DATA_DIR``/review_queue, sonst ``<repo>/data/review_queue``.
+
+    Call-time aufgelöst (M8.6, REQ-813): die frozen App setzt die Variable
+    im Launcher, nach den Modul-Imports.
+    """
+    return core_data_dir() / "review_queue"
+
+
+def default_extracted_dir() -> Path:
+    """``SIA_CORE_DATA_DIR``/extracted, sonst ``<repo>/data/extracted``."""
+    return core_data_dir() / "extracted"
+
 
 _GAP_ID_RE = re.compile(r"GAP-\d{4}")
 
@@ -74,7 +86,7 @@ def list_queue(
     Unlesbare Dateien und unbekannte Objekttypen werden übersprungen
     (best-effort; eine kaputte Datei blockiert die Queue nicht).
     """
-    directory = DEFAULT_QUEUE_DIR if queue_dir is None else queue_dir
+    directory = default_queue_dir() if queue_dir is None else queue_dir
     candidates: list[dict[str, object]] = []
     gaps: list[dict[str, object]] = []
     if not directory.is_dir():
@@ -112,8 +124,8 @@ def approve(
     Datei atomar nach ``extracted/`` (Ziel schreiben → Quelle löschen;
     bei Fehlschlag bleibt der Kandidat in der Queue).
     """
-    directory = DEFAULT_QUEUE_DIR if queue_dir is None else queue_dir
-    target_dir = DEFAULT_EXTRACTED_DIR if extracted_dir is None else extracted_dir
+    directory = default_queue_dir() if queue_dir is None else queue_dir
+    target_dir = default_extracted_dir() if extracted_dir is None else extracted_dir
     if not isinstance(obj_id, str) or not obj_id.strip():
         raise ReviewError("Ungültige Objekt-ID.")
     queue_file = _queue_file(directory, obj_id)
@@ -164,7 +176,7 @@ def reject(obj_id: str, queue_dir: Path | None = None) -> str:
     Die Datei wird aus der Queue entfernt; eine Audit-Zeile (ID +
     UTC-Zeitstempel, kein Normtext, G4) geht auf stderr.
     """
-    directory = DEFAULT_QUEUE_DIR if queue_dir is None else queue_dir
+    directory = default_queue_dir() if queue_dir is None else queue_dir
     if not isinstance(obj_id, str) or not obj_id.strip():
         raise ReviewError("Ungültige Objekt-ID.")
     queue_file = _queue_file(directory, obj_id)

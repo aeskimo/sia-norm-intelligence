@@ -62,8 +62,8 @@ def _write(queue_dir: Path, obj: dict[str, object]) -> Path:
 def _build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[TestClient, ShopState]:
     monkeypatch.setenv("SIA_FAKE_KEYCHAIN", str(tmp_path / "keychain"))
     monkeypatch.delenv("SIA_STATE_KEY_B64", raising=False)
-    monkeypatch.setattr(review_service, "DEFAULT_QUEUE_DIR", tmp_path / "queue")
-    monkeypatch.setattr(review_service, "DEFAULT_EXTRACTED_DIR", tmp_path / "extracted")
+    # Hermetik (M8.6): Core-Daten-Mount in den tmp-Pfad (statt Repo-data/).
+    monkeypatch.setenv("SIA_CORE_DATA_DIR", str(tmp_path))
     shop = ShopState(data_dir=tmp_path / "data")
     app = build_app(
         db_path=tmp_path / "catalog.db",
@@ -98,17 +98,29 @@ def test_req809_list_queue_missing_dir_is_empty(tmp_path: Path) -> None:
     assert list_queue(tmp_path / "nichts") == ([], [])
 
 
-def test_req809_default_dirs_use_repo_root() -> None:
-    """Regression: ROOT muss der Repo-Root sein wie in allen Kern-Modulen.
+def test_req809_default_dirs_use_repo_root(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: Ohne ``SIA_CORE_DATA_DIR`` müssen die Default-Dirs auf
+    ``<repo>/data/`` zeigen (nicht ``src/data/`` — Buggy ``parents[2]``).
 
-    Buggy ``parents[2]`` (statt ``parents[3]``) zeigte auf ``src/data/`` —
-    dann findet die App in der Praxis weder Queue noch extracted-Verzeichnis.
+    M8.6: Auflösung call-time über ``core_data_dir()`` (frozen-App-Override).
     """
     from sni.api import main as core_api
 
-    assert review_service.ROOT == core_api.ROOT
-    assert review_service.DEFAULT_QUEUE_DIR == core_api.ROOT / "data" / "review_queue"
-    assert review_service.DEFAULT_EXTRACTED_DIR == core_api.ROOT / "data" / "extracted"
+    monkeypatch.delenv("SIA_CORE_DATA_DIR", raising=False)
+    assert review_service.default_queue_dir() == core_api.ROOT / "data" / "review_queue"
+    assert review_service.default_extracted_dir() == core_api.ROOT / "data" / "extracted"
+
+
+def test_req809_default_dirs_follow_core_data_dir(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """M8.6 (REQ-813): ``SIA_CORE_DATA_DIR``-Override steuert die Default-Dirs."""
+    monkeypatch.setenv("SIA_CORE_DATA_DIR", str(tmp_path))
+    assert review_service.default_queue_dir() == tmp_path / "review_queue"
+    assert review_service.default_extracted_dir() == tmp_path / "extracted"
 
 
 # ------------------------------------------------------------- Service: Freigabe
@@ -244,8 +256,8 @@ def test_req809_api_queue_lists_candidates_and_gaps(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     client, _ = _build(tmp_path, monkeypatch)
-    _write(tmp_path / "queue", CANDIDATE)
-    _write(tmp_path / "queue", GAP)
+    _write(tmp_path / "review_queue", CANDIDATE)
+    _write(tmp_path / "review_queue", GAP)
     res = client.get("/v1/review/queue", headers=HDRS)
     assert res.status_code == 200
     data = res.json()
@@ -257,7 +269,7 @@ def test_req809_api_approve_with_explicit_approver(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     client, _ = _build(tmp_path, monkeypatch)
-    _write(tmp_path / "queue", CANDIDATE)
+    _write(tmp_path / "review_queue", CANDIDATE)
     res = client.post(
         f"/v1/review/{CANDIDATE['id']}/approve",
         json={"approved_by": "Max Muster"},
@@ -268,14 +280,14 @@ def test_req809_api_approve_with_explicit_approver(
     assert data["status"] == "approved" and data["approved_by"] == "Max Muster"
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", data["approved_at"])
     assert (tmp_path / "extracted" / "sia_statement_sia416-2003_4.1_1.json").is_file()
-    assert not (tmp_path / "queue" / "sia_statement_sia416-2003_4.1_1.json").exists()
+    assert not (tmp_path / "review_queue" / "sia_statement_sia416-2003_4.1_1.json").exists()
 
 
 def test_req809_api_approve_falls_back_to_settings(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     client, shop = _build(tmp_path, monkeypatch)
-    _write(tmp_path / "queue", CANDIDATE)
+    _write(tmp_path / "review_queue", CANDIDATE)
     update_settings(shop.data_dir, {"approval_name": "SIA-Prüferin"})
     res = client.post(f"/v1/review/{CANDIDATE['id']}/approve", json={}, headers=HDRS)
     assert res.status_code == 200
@@ -286,12 +298,12 @@ def test_req809_api_approve_without_any_approver_is_400(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     client, _ = _build(tmp_path, monkeypatch)
-    _write(tmp_path / "queue", CANDIDATE)
+    _write(tmp_path / "review_queue", CANDIDATE)
     res = client.post(f"/v1/review/{CANDIDATE['id']}/approve", json={}, headers=HDRS)
     assert res.status_code == 400
     assert "Keine Freigabeperson" in res.json()["error"]
     # Kandidat bleibt unverändert in der Queue
-    assert (tmp_path / "queue" / "sia_statement_sia416-2003_4.1_1.json").is_file()
+    assert (tmp_path / "review_queue" / "sia_statement_sia416-2003_4.1_1.json").is_file()
 
 
 def test_req809_api_approve_unknown_object_is_400(
@@ -309,11 +321,11 @@ def test_req809_api_approve_unknown_object_is_400(
 
 def test_req809_api_reject_removes_object(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     client, _ = _build(tmp_path, monkeypatch)
-    _write(tmp_path / "queue", CANDIDATE)
+    _write(tmp_path / "review_queue", CANDIDATE)
     res = client.post(f"/v1/review/{CANDIDATE['id']}/reject", headers=HDRS)
     assert res.status_code == 200
     assert res.json()["status"] == "rejected"
-    assert not (tmp_path / "queue" / "sia_statement_sia416-2003_4.1_1.json").exists()
+    assert not (tmp_path / "review_queue" / "sia_statement_sia416-2003_4.1_1.json").exists()
 
 
 def test_req809_api_reject_unknown_object_is_400(

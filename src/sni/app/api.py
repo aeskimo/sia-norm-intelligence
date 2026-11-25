@@ -38,9 +38,9 @@ from sni.documents.pdfcache import CacheIntegrityError
 from sni.documents.registry import LocalDocumentState
 from sni.export.semantic import export as semantic_export
 from sni.ingest.pipeline import (
-    DEFAULT_NORMS_DIR,
-    DEFAULT_QUEUE_DIR,
     IngestError,
+    default_norms_dir,
+    default_queue_dir,
     ingest_document,
     load_document,
 )
@@ -858,13 +858,13 @@ def semantic_export_endpoint(payload: SemanticExportRequest, request: Request) -
         return _error(400, "Keine Volltextseiten: Norm zuerst indexieren.")
     try:
         result = semantic_export(
-            DEFAULT_NORMS_DIR, document.number, document.year, list(pages), concepts
+            default_norms_dir(), document.number, document.year, list(pages), concepts
         )
     except ValueError as exc:
         return _error(400, str(exc))
     try:
-        document_json = load_document(result.norm_id, DEFAULT_NORMS_DIR)
-        ingested = ingest_document(document_json, store, DEFAULT_QUEUE_DIR)
+        document_json = load_document(result.norm_id)
+        ingested = ingest_document(document_json, store, default_queue_dir())
     except IngestError as exc:
         return _error(400, exc.report[0] if exc.report else str(exc))
     return JSONResponse(
