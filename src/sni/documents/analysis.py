@@ -21,6 +21,7 @@ from dataclasses import dataclass
 
 from sni.extract.engines import PdfTextExtractor, get_extractor
 from sni.models.embedding import DocumentEmbeddingService, OllamaEmbeddingProvider
+from sni.rag.grounded import SearchProvider
 from sni.search.fulltext import LocalFullTextIndex
 from sni.search.hybrid import HybridSearch
 from sni.search.page_source import PageSource
@@ -104,6 +105,15 @@ class DocumentAnalysisPipeline:
     @property
     def hybrid_ready(self) -> bool:
         return self._hybrid is not None
+
+    def rag_search(self) -> SearchProvider:
+        """Suchquelle für RAG (REQ-805): hybrid wenn Vektoren bereit, sonst Volltext.
+
+        Java-Äquivalent: ``hybrid::searchForRag`` bzw. ``index::search``.
+        """
+        if self._hybrid is not None:
+            return self._hybrid.search_for_rag
+        return self._full_text.search
 
     # ------------------------------------------------------------------ Indexierung
 

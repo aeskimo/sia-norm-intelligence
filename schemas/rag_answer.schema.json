@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sni:rag_answer",
+  "type": "object",
+  "required": ["text", "status", "sources", "model_id", "disclaimer"],
+  "properties": {
+    "text": {"type": "string", "description": "Antworttext (inkl. [Qn]-Zitate); bei Abweisung der Abweisungstext"},
+    "status": {
+      "enum": [
+        "DIRECTLY_SUPPORTED",
+        "DERIVED_FROM_MULTIPLE_SOURCES",
+        "INSUFFICIENT_EVIDENCE"
+      ],
+      "description": "Aussageklasse (REQ-805): exakt 1 zitierte Quelle / mehrere / Abweisung"
+    },
+    "sources": {
+      "type": "array",
+      "description": "Zitierte Quellenblöcke (vollständige Seiten bleiben erhalten); leer bei INSUFFICIENT_EVIDENCE",
+      "items": {
+        "type": "object",
+        "required": ["source_id", "standard", "edition", "page", "section", "text"],
+        "properties": {
+          "source_id": {"type": "string"},
+          "standard": {"type": "string"},
+          "edition": {"type": "string"},
+          "page": {"type": "integer", "minimum": 1},
+          "section": {"type": "string"},
+          "text": {"type": "string"}
+        }
+      }
+    },
+    "model_id": {"type": "string", "description": "Modell-Bezeichnung, die die Antwort erzeugt hat (z. B. ollama:qwen3:4b)"},
+    "disclaimer": {"type": "string", "description": "G6: jede fachliche API-Antwort trägt den Disclaimer"}
+  }
+}

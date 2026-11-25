@@ -11,10 +11,15 @@ Endpunkte (09_CONSUMER_APP.md §6.2): Login/Logout, Katalog, Download
 from __future__ import annotations
 
 import contextlib
+import json
+import os
+import queue
+import threading
+from collections.abc import Iterator, Mapping
 from typing import Literal, cast
 
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 from sni.api.main import DISCLAIMER
@@ -25,10 +30,23 @@ from sni.app.shop import (
     ShopState,
     resolve_provider,
 )
+from sni.documents.analysis import OLLAMA_URL
 from sni.documents.downloads import Job
 from sni.documents.pdfcache import CacheIntegrityError
 from sni.documents.registry import LocalDocumentState
+from sni.rag.grounded import GroundedQa
+from sni.rag.model_provider import ModelProvider
+from sni.rag.providers.gibb import OpenAiCompatibleProvider
+from sni.rag.providers.ollama import OllamaChatProvider
+from sni.search.page_source import PageSource
+from sni.secrets.keyring_store import GibbApiKeyStore
 from sni.shop.catalog_xml import StandardDocument
+from sni.state.workspace import (
+    DEFAULT_GENERATION_MODEL,
+    DEFAULT_GIBB_BASE_URL,
+    DEFAULT_PROVIDER,
+    load_workspace_json,
+)
 
 router = APIRouter(tags=["app"])
 
@@ -111,6 +129,20 @@ class AnalyzeRequest(BaseModel):
     """Analyse-Anfrage (09 §6.2); ``embedding_model`` leer → nur Volltext."""
 
     embedding_model: str = ""
+
+
+class AskScope(BaseModel):
+    """RAG-Scope (09 §6.2): Produkt-IDs und/oder Arbeitsset."""
+
+    document_ids: list[str] | None = None
+    workset_id: str | None = None
+
+
+class AskRequest(BaseModel):
+    """RAG-Frage (09 §6.2); Antwort als SSE-Stream."""
+
+    question: str
+    scope: AskScope | None = None
 
 
 # ------------------------------------------------------------------ Helfer
@@ -206,6 +238,123 @@ def _remember(shop: ShopState, customer: str, password: str) -> str:
         return "ok"
     except Exception as exc:  # noqa: BLE001 — Login bleibt Erfolg, UI meldet
         return f"Zugangsdaten konnten nicht gespeichert werden: {exc}"
+
+
+# ------------------------------------------------------------------ RAG (SSE)
+
+
+def _sse(event: str, data: Mapping[str, object]) -> bytes:
+    """Ein SSE-Ereignis (09 §6.2): ``event:``-Zeile + ``data:``-JSON."""
+    payload = json.dumps(dict(data), ensure_ascii=False)
+    return f"event: {event}\ndata: {payload}\n\n".encode()
+
+
+def _source_block(source: PageSource) -> dict[str, object]:
+    """Quellenblock (09 §6.2): vollständige Seite bleibt in der Übersicht."""
+    return {
+        "source_id": source.source_id(),
+        "standard": source.standard,
+        "edition": source.edition,
+        "page": source.page,
+        "section": source.section,
+        "text": source.text,
+    }
+
+
+def _ask_scope(
+    shop: ShopState, bundle: ShopBundle, scope: AskScope | None
+) -> set[str] | None | JSONResponse:
+    """Scope-Prüfung: Produkt-IDs und/oder Arbeitsset (aus workspace.json)."""
+    if scope is None:
+        return None
+    ids = {doc_id.strip() for doc_id in scope.document_ids or [] if doc_id.strip()}
+    workset_id = (scope.workset_id or "").strip()
+    if workset_id:
+        state = load_workspace_json(shop.data_dir) or {}
+        raw_worksets = state.get("worksets")
+        worksets = raw_worksets if isinstance(raw_worksets, dict) else {}
+        docs = worksets.get(workset_id)
+        if not isinstance(docs, list):
+            return _error(400, f"Arbeitsset unbekannt: {workset_id!r}")
+        ids.update(str(doc_id) for doc_id in docs)
+    return ids or None
+
+
+def _ask_model_provider(shop: ShopState) -> ModelProvider:
+    """Antwortmodell aus workspace.json (REQ-805); Standard: lokales Ollama.
+
+    gibb: Bearer aus Umgebungsvariable ``GIBB_API_KEY`` oder Keyring
+    (``gibb-api-key``); der Key wird nie an die UI ausgeliefert.
+    """
+    state = load_workspace_json(shop.data_dir) or {}
+    provider = str(state.get("provider") or DEFAULT_PROVIDER)
+    if provider == "gibb":
+        base_url = str(state.get("gibb_base_url") or DEFAULT_GIBB_BASE_URL)
+        model = str(state.get("gibb_model") or "").strip()
+        if not model:
+            raise RuntimeError("gibb-Modell ist nicht konfiguriert")
+        api_key = os.environ.get("GIBB_API_KEY", "").strip()
+        if not api_key:
+            api_key = GibbApiKeyStore().load() or ""
+        if not api_key:
+            raise RuntimeError("gibb-API-Key fehlt (Umgebungsvariable GIBB_API_KEY oder Keyring)")
+        return OpenAiCompatibleProvider(base_url, api_key, model)
+    model = str(state.get("generation_model") or DEFAULT_GENERATION_MODEL)
+    return OllamaChatProvider(OLLAMA_URL, model)
+
+
+def _ask_events(
+    shop: ShopState, bundle: ShopBundle, question: str, scope: set[str] | None
+) -> Iterator[bytes]:
+    """SSE-Stream (09 §6.2): ``token`` → ``sources`` → ``answer`` bzw. ``error``.
+
+    Die (blockierende) Generierung läuft im Worker-Thread; Token werden
+    über eine Queue in den Stream geschleust, damit ``StreamingResponse``
+    sie sofort an die UI liefern kann.
+    """
+    out: queue.Queue[tuple[str, Mapping[str, object]] | None] = queue.Queue()
+
+    def run() -> None:
+        try:
+            provider = _ask_model_provider(shop)
+            qa = GroundedQa(bundle.pipeline.rag_search(), provider)
+
+            def on_token(chunk: str) -> None:
+                out.put(("token", {"text": chunk}))
+
+            answer = qa.ask(question, scope, on_token=on_token)
+            sources = [_source_block(source) for source in answer.sources]
+            out.put(("sources", {"sources": sources}))
+            out.put(
+                (
+                    "answer",
+                    {
+                        "text": answer.text,
+                        "status": answer.status,
+                        "sources": sources,
+                        "model_id": answer.model_id,
+                        "disclaimer": DISCLAIMER,
+                    },
+                )
+            )
+            out.put(None)
+        except Exception as exc:  # noqa: BLE001 — Fehler als SSE-``error``-Event
+            out.put(
+                (
+                    "error",
+                    {"error": f"{type(exc).__name__}: {exc}", "disclaimer": DISCLAIMER},
+                )
+            )
+            out.put(None)
+
+    worker = threading.Thread(target=run, daemon=True)
+    worker.start()
+    while True:
+        item = out.get()
+        if item is None:
+            break
+        yield _sse(item[0], item[1])
+    worker.join()
 
 
 # ------------------------------------------------------------------ Endpunkte
@@ -364,6 +513,31 @@ def document_analyze(
     return JSONResponse(
         {"status": "accepted", "job": _job(job), "disclaimer": DISCLAIMER},
         status_code=202,
+    )
+
+
+@router.post("/ask", response_model=None)
+def ask(payload: AskRequest, request: Request) -> StreamingResponse | JSONResponse:
+    """09 §6.2: RAG-Frage als SSE-Stream (``token``/``sources``/``answer``/``error``).
+
+    Das Token kommt über den Query-Parameter ``sia_token`` (EventSource
+    kann keine Header setzen). Der Provider (Ollama/gibb) und das Modell
+    stammen aus ``workspace.json``; ohne Vektoren bleibt die Suche
+    lexikalisch (Volltext).
+    """
+    bundle = _require_bundle(request)
+    if isinstance(bundle, JSONResponse):
+        return bundle
+    question = payload.question.strip()
+    if not question:
+        return _error(400, "question darf nicht leer sein.")
+    scope = _ask_scope(_shop(request), bundle, payload.scope)
+    if isinstance(scope, JSONResponse):
+        return scope
+    return StreamingResponse(
+        _ask_events(_shop(request), bundle, question, scope),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 

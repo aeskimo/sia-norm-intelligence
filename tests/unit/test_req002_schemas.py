@@ -18,6 +18,7 @@ EXPECTED = {
     "local_document.schema.json",  # M8.2 (09 §6.2)
     "norm_statement.schema.json",
     "project_values.schema.json",
+    "rag_answer.schema.json",  # M8.3 (09 §6.2)
     "rule.schema.json",
     "source_reference.schema.json",
     "status.schema.json",

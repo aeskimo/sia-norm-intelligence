@@ -105,6 +105,11 @@ class ShopState:
         """Keyring-Store für ``remember`` (Merken-Checkbox, REQ-802)."""
         return self._login_store
 
+    @property
+    def data_dir(self) -> Path | None:
+        """User-Datenverzeichnis (``SIA_DATA_DIR``/Injektion); ``None`` = Default."""
+        return self._data_dir
+
     # ------------------------------------------------------------------ Sitzung
 
     def login(
