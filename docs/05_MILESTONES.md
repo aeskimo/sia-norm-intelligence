@@ -68,3 +68,29 @@ Jeder Milestone ist erst fertig, wenn alle Kriterien als Test existieren und gr�
 - REQ-901: Extraktion ist atomar: alle Fehler werden gesammelt als Bericht geliefert; bei Fehlern wird keine Datei geschrieben (KBOB-Muster)
 - REQ-902: G4: Fehlerbericht und CLI-Ausgabe enthalten nur Norm-ID, Ziffern, Feldnamen und Zählungen – nie Normtexte
 - REQ-903: Given ein extrahierter Entwurf When die Fachperson die `document.json` vervollständigt (Stufe 2, manuell) Then erzeugt die bestehende Ingest-Pipeline (M2) unverändert Kandidaten mit Fundstelle
+
+## Post-v1-Milestones (geplant, 25.11.2026 — User-Entscheid: offene Fäden aus der v1-Abschliessung als Meilensteine festschreiben)
+
+## M10 – Distribution-Readiness: Code-Signing & Notarization (OQ-014)
+Voraussetzung (User, extern): Apple-Developer-Programm (Developer ID Application) + Windows-Code-Signing-Zertifikat (OV oder EV); Credentials als CI-Secrets (nie im Repo).
+- REQ-1000: macOS: die `.app` wird mit Developer ID signiert (Binary-Level + App-Level), notarisiert (`notarytool`: submit → wait → Log-Verifikation) und gestapelt; Akzeptanz: Start auf einem frischen macOS ohne Gatekeeper-Warnung und ohne Quarantäne-Block
+- REQ-1001: Windows: EXE wird Authenticode-signiert; Akzeptanz: SmartScreen zeigt den bekannten Publisher (OV: nach Schwellenwert, EV: ab dem ersten Start)
+- REQ-1002: CI: der `installers`-Job signiert nur bei vorhandenen Secrets (bedingte Steps); ohne Secrets bleibt der M8.6-Zustand (unsigned + Doku-Hinweis 09 §11) — die Pipeline wird nie an fehlenden Credentials gehängt
+- REQ-1003: Nachvollziehbarkeit: Signing-/Notarization-Logs werden als zusätzliches Artifact hochgeladen; 09 §11 + OQ-014 (09 §16) auf «entschieden/umgesetzt» aktualisiert
+
+## M11 – Vollständiger Pilot-Satz: echte Normen mit Textschicht (ADR-0010 Stufe 1+2, OQ-015-Rest)
+Voraussetzung (extern): SIA-Neuexport der 8 textlosen PDFs mit Textschicht (User-Anfrage, 09 §15).
+- REQ-1100: When die neuen PDFs vorhanden sind Then Re-Extraktion aller 9 Pilot-Normen (`make extract`); Akzeptanz: Ziffern-Skelette stabil gegen die Druckausgabe (nur Zählungen/Ziffernvergleich, G4), keine Regression gegen die M9-Baseline
+- REQ-1101: Stufe 2 (manuell): `document.draft.json` → `document.json` für alle 9 Normen vervollständigen, `make ingest` pro Norm; Akzeptanz: alle 9 Normen `FULLTEXT_READY` in der Registry, Suche/RAG (REQ-804) über den vollen Pilot-Satz nutzbar
+- REQ-1102: Falls die SIA keine Textschicht liefern kann: Entscheid M12 (OCR) wird dokumentiert und das Milestone schliesst mit dem dokumentierten Fallback
+
+## M12 – OCR für PDFs ohne Textschicht (nur bei M11-REQ-1102-Fallback)
+- REQ-1200: ADR für die OCR-Engine (Lizenzprüfung gemäss AGENTS.md §5, Qualitäts-Baseline gegen den Textschicht-Weg); ausschliesslich lokale Verarbeitung (G4: kein Normtext über das Netzwerk)
+- REQ-1201: `make extract NORM=<id> --ocr` (explizites Opt-in): nur für PDFs ohne Textschicht; mit Textschicht bleibt der M9-Weg unverändert
+- REQ-1202: Akzeptanz: ≥ 8 von 9 Pilot-Normen liefern ein Ziffern-Skelett, das der Textschicht-Extraktion qualitativ entspricht; Fehlerbericht G4-konform (nur Zählungen/Feldnamen)
+
+## M13 – Stufe 3: LLM-gestützte Vervollständigung (ADR-0010 Stufe 3, eigener Meilenstein gemäss ADR)
+Voraussetzung (extern): ADR-0003-Freigabe (SIA: Endpoint ohne Trainingsnutzung, Konfiguration `SNI_LLM_ENDPOINT`).
+- REQ-1300: LLM-Tool schlägt die Stufe-2-Fachfelder (Aussageklasse, Obligation, Zusammenfassung, Konzepte) aus dem Ziffern-Text des Entwurfs vor; Akzeptanz: nichts landet ohne menschliche Freigabe in der `document.json` (G1/G3)
+- REQ-1301: ausschliesslich freigegebene Modelle/Endpunkte (ADR-0003); Normtext verlässt die lokale Umgebung nur Richtung des konfigurierten Endpoints
+- REQ-1302: ADR-0003 auf «akzeptiert» führen, Stufe 3 in ADR-0010 umsetzen und dokumentieren
