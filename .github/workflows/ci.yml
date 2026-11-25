@@ -56,22 +56,65 @@ jobs:
             # <3.59, weil 3.59 GLib >= 2.84 braucht (ubuntu-latest = 2.80).
             pip install "PyGObject<3.59"
           fi
+      - name: "P0a-Probe: Gtk.init_check-Timing unter Xvfb (reines PyGObject)"
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          # Binary-Such: wie lange dauert eine reine GTK-Init (ohne
+          # GApplication/WebKit)? Mass für "langsame kalte Init" vs. Hang.
+          set +e
+          timeout 60 xvfb-run --auto-servernum python3 -c "import time,gi
+t0=time.monotonic()
+gi.require_version('Gtk','3.0')
+from gi.repository import Gtk
+Gtk.init_check([])
+print('P0a: Gtk.init_check ok nach %.1f s' % (time.monotonic()-t0))
+"
+          rc=$?
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::P0a: Gtk.init_check rc=$rc (kalte Init >60 s oder Hang)"
+            exit "$rc"
+          fi
+      - name: "P0b-Probe: Gtk.init_check mit NO_AT_BRIDGE=1 (A11y-Brücke skippt)"
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          NO_AT_BRIDGE: "1"
+        run: |
+          # Variante ohne ATK-Brücke: isoliert, ob der A11y-Bus-Check
+          # (ServiceUnknown auf dem GHA-Runner) der Blockpunkt ist.
+          set +e
+          timeout 60 xvfb-run --auto-servernum python3 -c "import time,gi
+t0=time.monotonic()
+gi.require_version('Gtk','3.0')
+from gi.repository import Gtk
+Gtk.init_check([])
+print('P0b: Gtk.init_check (NO_AT_BRIDGE=1) ok nach %.1f s' % (time.monotonic()-t0))
+"
+          rc=$?
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::P0b: Gtk.init_check mit NO_AT_BRIDGE rc=$rc (A11y ist nicht der Blockpunkt)"
+            exit "$rc"
+          fi
       - name: "P1-Probe: Gtk.Application activate unter Xvfb (ohne pywebview)"
         if: runner.os == 'Linux'
         shell: bash
         run: |
           # Binary-Such: feuert ``activate`` bei einem plainen Gtk.Application
           # (exakt pywebview-Form, ohne Abstraktion)? Isoliert GHA-Umgebung
-          # vs. pywebview-Code vs. PyInstaller-Bundle.
+          # vs. pywebview-Code vs. PyInstaller-Bundle. Watchdog 45 s +
+          # Heartbeat trennen "langsame Init" von echtem Hang.
           python3 -c "import gi; print('[P1] gi-Import OK')"
           set +e
-          timeout 60 xvfb-run --auto-servernum python3 packaging/ci_gtk_probe.py
+          timeout 90 xvfb-run --auto-servernum python3 packaging/ci_gtk_probe.py
           rc=$?
           set -e
           if [ "$rc" -eq 0 ]; then
             echo "P1 OK: activate feuert unter Xvfb — Umgebung ist nicht der Engpass"
           elif [ "$rc" -eq 124 ]; then
-            echo "::error::P1: Prozess-Hang trotz Watchdog (timeout 60 s) — Env-Dump:"
+            echo "::error::P1: Prozess-Hang trotz Watchdog (timeout 90 s) — Env-Dump:"
             env | sort | grep -Ei 'display|dbus|xdg|wayland|gdk' || true
             exit 1
           else
@@ -83,12 +126,15 @@ jobs:
         shell: bash
         env:
           SIA_HELLO_WINDOW_SECONDS: "5"
+          # Shown-Wait toleriert langsame (kalte) Init: 5 s + 40 s = 45 s,
+          # konsistent mit P1- watchdog.
+          SIA_HELLO_WINDOW_SHOWN_WAIT: "40"
           WEBKIT_DISABLE_COMPOSITING_MODE: "1"
         run: |
           # Binary-Such: dieselbe App, exakt derselbe Code — nur ohne
           # PyInstaller-Bundle. Isoliert pywebview-Code vs. Packaging.
           set +e
-          timeout 60 xvfb-run --auto-servernum python3 packaging/hello_window.py
+          timeout 90 xvfb-run --auto-servernum python3 packaging/hello_window.py
           rc=$?
           set -e
           if [ "$rc" -eq 0 ]; then
@@ -110,6 +156,8 @@ jobs:
         shell: bash
         env:
           SIA_HELLO_WINDOW_SECONDS: "5"
+          # Shown-Wait toleriert langsame (kalte) Init: 5 s + 40 s = 45 s.
+          SIA_HELLO_WINDOW_SHOWN_WAIT: "40"
           # WebKit2GTK ohne GPU (Runner): Compositing abschalten, sonst Crashes.
           WEBKIT_DISABLE_COMPOSITING_MODE: "1"
         run: |

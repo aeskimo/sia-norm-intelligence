@@ -87,16 +87,32 @@ def _diagnose() -> None:
 def _auto_close(window) -> None:
     """CI-Auto-Schliessen: Shown-Event abwarten, dann destroy + Backstop.
 
+    Das Shown-Event (Backend-spezifisch, z. B. GTK/WebKit
+    ``notify::visible``) kann unter CI langsam kommen (kalte GTK-Init,
+    Xvfb). Deshalb wird nicht einmalig 5 s gewartet, sondern gepollt,
+    bis ``SIA_HELLO_WINDOW_SHOWN_WAIT`` (Default 30 s) — ein langsamer,
+    aber funktionierender Init darf keinen falschen Negativ-Befund
+    liefern (Binary-Such 2026-11-25, Linux/Xvfb).
+
     Ohne das Shown-Event würde ``window.destroy()`` nach 20 s in einem
     Neben-Thread stillschweigend ``WebViewException`` werfen und die App
     für immer weiterlaufen (CI-Hang, beobachtet 2026-11-24 Linux/Xvfb).
     """
+    import time
 
     def _backstop() -> None:
         print("[packaging-smoke] destroy lief nicht aus → Backstop os._exit(0)", file=sys.stderr)
         os._exit(0)
 
-    if window.events.shown.wait(5):
+    shown_wait = float(os.environ.get("SIA_HELLO_WINDOW_SHOWN_WAIT", "30"))
+    deadline = time.monotonic() + shown_wait
+    shown = False
+    while time.monotonic() < deadline:
+        if window.events.shown.wait(1):
+            shown = True
+            break
+
+    if shown:
         print("[packaging-smoke] Fenster angezeigt → window.destroy()", file=sys.stderr)
         # Daemon-Thread: Wenn die App normal beendet, stirbt der Backstop
         # mit dem Prozess. Er feuert nur, wenn was wirklich hängen bleibt.
