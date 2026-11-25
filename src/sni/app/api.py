@@ -31,10 +31,19 @@ from sni.app.shop import (
     ShopState,
     resolve_provider,
 )
+from sni.catalog.store import ConceptStore
 from sni.documents.analysis import OLLAMA_URL
 from sni.documents.downloads import Job
 from sni.documents.pdfcache import CacheIntegrityError
 from sni.documents.registry import LocalDocumentState
+from sni.export.semantic import export as semantic_export
+from sni.ingest.pipeline import (
+    DEFAULT_NORMS_DIR,
+    DEFAULT_QUEUE_DIR,
+    IngestError,
+    ingest_document,
+    load_document,
+)
 from sni.models.ollama_manager import OllamaModelManager
 from sni.rag.grounded import GroundedQa
 from sni.rag.model_provider import ModelProvider
@@ -108,6 +117,12 @@ class WorksetUpdateRequest(BaseModel):
     """Arbeitsset: Dokument-Liste ersetzen (09 §6.2)."""
 
     document_ids: list[str]
+
+
+class SemanticExportRequest(BaseModel):
+    """Semantik-Export (09 §6.2): ``norm_id`` = product_id des lokalen Dokuments."""
+
+    norm_id: str
 
 
 class ReviewApproveRequest(BaseModel):
@@ -806,6 +821,61 @@ def worksets_delete(name: str, request: Request) -> JSONResponse:
         shop.worksets.delete(name)
         shop.save_worksets()
     return JSONResponse({"ok": True, "disclaimer": DISCLAIMER})
+
+
+# ------------------------------------------------------------------ Semantik-Export (REQ-810)
+
+
+@router.post("/ingest/semantic-export")
+def semantic_export_endpoint(payload: SemanticExportRequest, request: Request) -> JSONResponse:
+    """09 §6.2: Deterministischer Semantik-Export → ``document.json`` → Ingest in-process.
+
+    1:1 Java ``IntelligencePanel.runExport``: Konzepte aus dem Datenkatalog
+    (``ConceptStore``), Volltextseiten aus dem lokalen Index; die Antwort
+    enthält nur Norm-ID, Kandidaten-/Gap-IDs, Zählungen und Gründe – nie
+    Normtexte (G4).
+    """
+    bundle = _require_bundle(request)
+    if isinstance(bundle, JSONResponse):
+        return bundle
+    state = bundle.registry.get(payload.norm_id)
+    document = state.document if state is not None else None
+    if document is None:
+        return _error(404, f"Unbekanntes lokales Dokument: {payload.norm_id}")
+    store: ConceptStore = request.app.state.store
+    concepts: list[tuple[str, str]] = []
+    for concept_id in store.concept_ids():
+        concept = store.get_concept(concept_id)
+        if concept is None:
+            continue
+        name: object = concept.get("name")
+        name_de = str(name.get("de") or "") if isinstance(name, dict) else ""
+        concepts.append((concept_id, name_de))
+    if not concepts:
+        return _error(400, "Katalog ist leer – zuerst Snapshot importieren.")
+    pages = bundle.pipeline.pages(payload.norm_id)
+    if not pages:
+        return _error(400, "Keine Volltextseiten: Norm zuerst indexieren.")
+    try:
+        result = semantic_export(
+            DEFAULT_NORMS_DIR, document.number, document.year, list(pages), concepts
+        )
+    except ValueError as exc:
+        return _error(400, str(exc))
+    try:
+        document_json = load_document(result.norm_id, DEFAULT_NORMS_DIR)
+        ingested = ingest_document(document_json, store, DEFAULT_QUEUE_DIR)
+    except IngestError as exc:
+        return _error(400, exc.report[0] if exc.report else str(exc))
+    return JSONResponse(
+        {
+            "norm_id": result.norm_id,
+            "candidates": [str(candidate["id"]) for candidate in ingested.candidates],
+            "skipped": list(result.skipped_reasons),
+            "gaps": [str(gap["id"]) for gap in ingested.gap_reports],
+            "disclaimer": DISCLAIMER,
+        }
+    )
 
 
 # ------------------------------------------------------------------ Review-Queue (REQ-809)

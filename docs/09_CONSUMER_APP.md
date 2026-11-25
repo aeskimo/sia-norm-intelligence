@@ -214,11 +214,19 @@ Sicherheit: §10.2 (zufälliger Port, Session-Token, Host/Origin-Check).
 | `DELETE` | `/v1/models/ollama/{name}` | Modell löschen |
 | `GET` | `/v1/models/gibb` | gibb-Modellliste (OpenAI `models`, Bearer aus Keyring) → `{available, models[]}` |
 | `GET/PUT` | `/v1/settings` | `sni:settings` (Modelle, Provider, gibb-URL/Modell, Freigabename); gibb-Key nie als Antwort (nur `gibb_key_set: true`) |
-| `POST` | `/v1/ingest/semantic-export` | `{norm_id}` → deterministischer Export → `document.json` → Ingest in-process → `{candidates[], skipped[], gaps[]}` |
+| `POST` | `/v1/ingest/semantic-export` | `{norm_id}` (product_id des lokalen Dokuments) → deterministischer Export → `document.json` → Ingest in-process → `{norm_id, candidates[], skipped[], gaps[]}` |
 | `GET` | `/v1/review/queue` | Kandidaten (`norm_statement`, `review_status=candidate`) + GAPs |
 | `POST` | `/v1/review/{id}/approve` | `{approved_by?}` → `approved` + `approved_at` + `source.verified=true`, Move nach `extracted/` (G3, ADR-0008) |
 | `POST` | `/v1/review/{id}/reject` | Kandidat verwerfen (G3) |
 | `GET` | `/v1/jobs` | Job-Queue → `[sni:job]` (UI pollt alle 2 s) |
+
+**Semantik-Export-Antwort (`/v1/ingest/semantic-export`):** `norm_id`
+maschinenlesbar (z. B. `sia416-2003`); `candidates` = Kandidaten-IDs,
+`skipped` = Übersprungs-Gründe (Ziffer-/Tabelle-Nummer + Grund), `gaps` =
+GAP-IDs — nie Normtexte (G4). Export und Ingest laufen in-process auf dem
+gleichen Daten-Mount wie die Kern-CLI (`data/norms/`, `data/review_queue/`).
+Voraussetzungen: Login, Dokument in der lokalen Registry, Katalog nicht
+leer, Norm indexiert (Volltextseiten vorhanden).
 
 **Streaming-Vertrag (`/v1/ask`):** ein SSE-Stream mit Event-Typen
 `token` (Text-Zeilstück), `sources` (Quellenblöcke), `answer`
