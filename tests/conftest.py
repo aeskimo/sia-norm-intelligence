@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import io
 import json
+import threading
 import zipfile
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
+from dataclasses import dataclass
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import cast
 
@@ -435,3 +439,71 @@ class FakeSoapClient(SiaSoapClient):
         if result.success and self._fake_srd_bytes is not None:
             self._last_document_base64 = base64.b64encode(self._fake_srd_bytes).decode("ascii")
         return result
+
+
+# ---------------------------------------------------------------------------
+# Lokaler Test-HTTP-Server (09_CONSUMER_APP.md §12: nur Mocks, 127.0.0.1:0)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class LoopbackServer:
+    """Handle für den lokalen Test-HTTP-Server (ephemeraler Port)."""
+
+    url: str
+
+
+def _not_found(_payload: bytes) -> tuple[int, str]:
+    return 404, '{"error":"not found"}'
+
+
+class _LoopbackHttpServer(ThreadingHTTPServer):
+    """ThreadingHTTPServer mit Pfade-Handler-Tabelle (``server.handlers``)."""
+
+    def __init__(self, handlers: dict[str, Callable[[bytes], tuple[int, str]]]) -> None:
+        super().__init__(("127.0.0.1", 0), _LoopbackRequestHandler)
+        self.handlers = handlers
+
+
+class _LoopbackRequestHandler(BaseHTTPRequestHandler):
+    """Leitet GET/POST an ``handlers[path]`` weiter (Mock-Endpunkte)."""
+
+    def log_message(self, format: str, *args: object) -> None:
+        pass  # Test-Ausgabe sauber halten
+
+    def do_GET(self) -> None:
+        self._dispatch(b"")
+
+    def do_POST(self) -> None:
+        length = int(self.headers.get("Content-Length") or 0)
+        self._dispatch(self.rfile.read(length))
+
+    def _dispatch(self, payload: bytes) -> None:
+        handlers = cast("_LoopbackHttpServer", self.server).handlers
+        status, body = handlers.get(self.path, _not_found)(payload)
+        data = body.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+
+@contextlib.contextmanager
+def loopback_server(
+    handlers: dict[str, Callable[[bytes], tuple[int, str]]],
+) -> Iterator[LoopbackServer]:
+    """Startet einen lokalen HTTP-Mock auf 127.0.0.1 mit ephemeralem Port.
+
+    ``handlers`` mappt Pfad → ``fn(payload) -> (status, json-String)``.
+    Kein echter Dienst (09 §12): nur Loopback, kein Poppler, kein Ollama.
+    """
+    server = _LoopbackHttpServer(handlers)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield LoopbackServer(url=f"http://127.0.0.1:{server.server_address[1]}")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5.0)

@@ -62,5 +62,5 @@ python_version = "3.12"
 mypy_path = "src"
 
 [[tool.mypy.overrides]]
-module = ["ifcopenshell.*", "webview"]
+module = ["ifcopenshell.*", "webview", "pypdfium2", "pypdfium2.*", "pdfminer", "pdfminer.*"]
 ignore_missing_imports = true
