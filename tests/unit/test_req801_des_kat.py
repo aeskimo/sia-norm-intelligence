@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import base64
 import io
+import re
 import zipfile
 
 import pytest
@@ -145,6 +146,8 @@ def test_req801_unwrap_non_ascii_reports_sizes_only() -> None:
     assert "Ciphertext: 16 Bytes" in message
     assert "Klartext: 8 Bytes" in message
     assert "\x80" not in message
+    # Ciphertext-Fingerabdruck (SHA-256, 16 Hex) für Lizenz-Vergleiche (G4)
+    assert re.search(r"FPA [0-9a-f]{16}\)", message)
 
 
 def test_req801_mro_rejects_non_zip() -> None:

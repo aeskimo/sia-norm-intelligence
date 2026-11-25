@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
 import io
 import re
 import xml.etree.ElementTree as ET
@@ -94,14 +95,17 @@ def unwrap_srd_value(wrapped_b64: str) -> str:
     try:
         return plain.decode("ascii")
     except UnicodeDecodeError as exc:
-        # G4: nur Zählungen (wie «gefunden: N» o. A.) — keine Schlüsselbytes.
-        # Die Ciphertext-Grösse verrät ein formatseitig verändertes Wrapping
-        # (16 Bytes = klassisches 8-Byte-Schlüssel-Material; mehr = langes
-        # Schlüsselmaterial, z. B. AES-Ära).
+        # G4: nur Zählungen + Ciphertext-Fingerabdruck (SHA-256, 16 Hex) —
+        # nie Schlüssel-Bytes. Der Ciphertext-Fingerabdruck erlaubt den
+        # Vergleich zweier Lizenzen (z. B. Java-Login vs. Python-Login)
+        # ohne Offenlegung des Materials: gleiche Werte = identischer
+        # Portal-Input; unterschiedlich = portalseitig unterschiedliche
+        # Materialausstellung (Gerät/Sitzung/Zeit abhängig).
+        fingerprint = hashlib.sha256(encoded).hexdigest()[:16]
         raise SiaShopError(
             "SRD_KEY/SRD_IV: Klartext nicht ASCII (Ciphertext: "
-            f"{len(encoded)} Bytes, Klartext: {len(plain)} Bytes) — "
-            "falscher Schlüssel/Format"
+            f"{len(encoded)} Bytes, Klartext: {len(plain)} Bytes, "
+            f"FPA {fingerprint}) — falscher Schlüssel/Format"
         ) from exc
 
 
