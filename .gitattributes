@@ -1,2 +1,5 @@
 ﻿* text=auto
+# Shell-Skripte immer mit LF auschecken (Windows-autocrlf würde CRLF
+# liefern; Zeilenumbrüche mit Backslash-Continuation brechen dann).
+*.sh text eol=lf
 
