@@ -450,7 +450,7 @@ def _ollama_status(shop: ShopState) -> dict[str, object]:
 
 @router.get("/status", response_model=StatusResponse)
 def status(request: Request) -> StatusResponse:
-    """REQ-800: App-Zustand für die Statuszeile in allen 6 Views."""
+    """REQ-800: App-Zustand für die Statuszeile in allen 7 Arbeitsbereichen."""
     shop = _shop(request)
     bundle = shop.bundle
     login: dict[str, object] | None = None

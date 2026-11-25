@@ -46,7 +46,7 @@
   }
 
   /* --- Hash-Router (6 Views wie die Java-Tabs + Onboarding, M8.6) -------- */
-  const VIEWS = ["catalog", "norms", "assistant", "intelligence", "models", "settings", "onboarding"];
+  const VIEWS = ["catalog", "norms", "assistant", "intelligence", "projectdata", "models", "settings", "onboarding"];
   const DEFAULT_VIEW = "catalog";
 
   function currentView() {
@@ -988,6 +988,11 @@
     setStatus($("view-intelligence"), kind, text);
   }
 
+  /* Statuszeile der Projektdaten-View (eigener Tab, eigene Zeile). */
+  function pdStatus(kind, text) {
+    setStatus($("view-projectdata"), kind, text);
+  }
+
   function showIntelReport(id, text) {
     const el = $(id);
     el.textContent = text;
@@ -1393,7 +1398,7 @@
       { concept: "sia:concept/gesamtflaeche", value: "150", unit: "m2" }
     ];
     renderIntelProject();
-    intelStatus("success", "Beispielwerte (Synthetik) geladen.");
+    pdStatus("success", "Beispielwerte (Synthetik) geladen.");
   });
 
   $("intel-row-add").addEventListener("click", function () {
@@ -1428,10 +1433,10 @@
         };
       });
       renderIntelProject();
-      intelStatus("success", "Projektdaten geladen: " + values.length +
+      pdStatus("success", "Projektdaten geladen: " + values.length +
         " Wert(e) aus " + (data.file || file.name));
     } catch (err) {
-      intelStatus("error", "Upload fehlgeschlagen: " + err.message);
+      pdStatus("error", "Upload fehlgeschlagen: " + err.message);
     } finally {
       this.value = "";
     }
@@ -1514,7 +1519,7 @@
     try {
       data = intelProjectData();
     } catch (err) {
-      intelStatus("error", "Projektdaten: " + err.message);
+      pdStatus("error", "Projektdaten: " + err.message);
       return;
     }
     $("intel-check").disabled = true;
@@ -1527,11 +1532,11 @@
       });
       const report = intelRenderCheck(r);
       showIntelReport("intel-check-report", report.text);
-      intelStatus("success", "Prüfung abgeschlossen: " + (r.checks || []).length +
+      pdStatus("success", "Prüfung abgeschlossen: " + (r.checks || []).length +
         " Regel(n) – " + report.pass + " pass, " + report.fail + " fail, " +
         report.missing + " insufficient_data");
     } catch (err) {
-      intelStatus("error", "Prüfung fehlgeschlagen: " + err.message);
+      pdStatus("error", "Prüfung fehlgeschlagen: " + err.message);
     } finally {
       $("intel-check").disabled = false;
       $("intel-check").textContent = "Prüfen";
@@ -1573,7 +1578,7 @@
     try {
       data = intelProjectData();
     } catch (err) {
-      intelStatus("error", "Projektdaten: " + err.message);
+      pdStatus("error", "Projektdaten: " + err.message);
       return;
     }
     try {
@@ -1582,18 +1587,18 @@
         { project_data: data },
         "sni-checks.bcf"
       );
-      intelStatus("success", "BCF gespeichert: sni-checks.bcf (" + size + " Bytes)");
+      pdStatus("success", "BCF gespeichert: sni-checks.bcf (" + size + " Bytes)");
     } catch (err) {
-      intelStatus("error", "BCF-Export fehlgeschlagen: " + err.message);
+      pdStatus("error", "BCF-Export fehlgeschlagen: " + err.message);
     }
   });
 
   $("intel-ids").addEventListener("click", async function () {
     try {
       await intelDownload("/v1/export/ids", {}, "sni-ids.json");
-      intelStatus("success", "IDS gespeichert: sni-ids.json");
+      pdStatus("success", "IDS gespeichert: sni-ids.json");
     } catch (err) {
-      intelStatus("error", "IDS-Export fehlgeschlagen: " + err.message);
+      pdStatus("error", "IDS-Export fehlgeschlagen: " + err.message);
     }
   });
 

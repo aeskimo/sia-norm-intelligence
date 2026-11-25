@@ -43,11 +43,18 @@
     },
     intelligence: {
       title: "Hilfe: Norm Intelligence",
-      tip: "Deterministische Werkzeuge ohne Antwortmodell: Normfrage mit Fundstelle, Semantik-Export, Review-Freigabe, Projektdaten-Prüfung. Ein Sprachmodell wird nur für den Semantik-Export genutzt.",
+      tip: "Deterministische Werkzeuge ohne Antwortmodell: Normfrage mit Fundstelle, Semantik-Export, Review-Freigabe. Ein Sprachmodell wird nur für den Semantik-Export genutzt. Die Projektdaten-Prüfung hat einen eigenen Bereich («Projektdaten» in der Navigation).",
       sections: [
         ["Normfrage (deterministisch)", "Stellt eine Frage an die indexierten Normtexte und liefert eine Antwort mit exakter Fundstelle (Norm, Ausgabe, Ziffer) — ohne Sprachmodell, deshalb reproduzierbar."],
         ["Semantik-Export → Review-Queue", "Der Export lässt das konfigurierte Modell aus einer indexierten Norm prüfbare Kandidaten (Aussagen, Begriffe) extrahieren. Diese landen in der Review-Queue und werden einzeln freigegeben oder abgelehnt (G3 — Freigabeperson pro Vorgang oder Standard aus den Einstellungen)."],
-        ["Projektdaten-Prüfung", "Prüft Projektdaten (CSV/IFC laden oder Zeilen pflegen, inkl. Beispiel-Synthetik) gegen die freigegebenen Regeln (REQ-501) und speichert das Ergebnis als BCF- oder IDS-Datei für Ihr Projekt."],
+      ],
+    },
+    projectdata: {
+      title: "Hilfe: Projektdaten",
+      tip: "Prüft Projektdaten (Flächen, Werte) deterministisch gegen die freigegebenen Regeln — ohne Sprachmodell. Das Ergebnis lässt sich als BCF- oder IDS-Datei für Ihr Projekt speichern.",
+      sections: [
+        ["Daten erfassen", "Zeilen pflegen (Konzept-Id wie «sia:concept/…», Wert, Einheit), per «+ Zeile» erweitern oder mit «Beispielwerte (Synthetik)» befüllen. CSV/IFC-Dateien werden direkt geladen."],
+        ["Prüfen & Exportieren", "«Prüfen» wendet alle approved Regeln an (REQ-501) und meldet pro Regel pass / fail / insufficient_data. «BCF speichern» bzw. «IDS speichern» erzeugt die Dateiformate für Ihr Projektdaten-Management."],
       ],
     },
     models: {

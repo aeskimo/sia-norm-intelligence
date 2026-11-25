@@ -1,9 +1,9 @@
 """REQ-814/REQ-800: UI-Gerüst — statische Dateien und Design-Baseline.
 
-Prüft, dass das UI-Gerüst (M8.1) die Baseline trägt: 6 Views,
-SIA-Design-Tokens (Light + Dark via prefers-color-scheme), CSP,
-Session-Token-Handling und volle Offline-Fähigkeit (keine externen
-Resources).
+Prüft, dass das UI-Gerüst (M8.1) die Baseline trägt: 7 Arbeitsbereiche
+(6 Java-Tabs + Projektdaten), SIA-Design-Tokens (Light + Dark via
+prefers-color-scheme), CSP, Session-Token-Handling und volle
+Offline-Fähigkeit (keine externen Resources).
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from pathlib import Path
 
 STATIC = Path(__file__).resolve().parents[2] / "src" / "sni" / "app" / "static"
 
-VIEWS = ("catalog", "norms", "assistant", "intelligence", "models", "settings")
+VIEWS = ("catalog", "norms", "assistant", "intelligence", "projectdata", "models", "settings")
 
 
 def _read(name: str) -> str:
@@ -20,8 +20,9 @@ def _read(name: str) -> str:
     return (STATIC / name).read_text(encoding="utf-8")
 
 
-def test_req814_index_has_all_six_views() -> None:
-    # Given die UI When geladen Then alle 6 Views (Java-Tabs) existieren
+def test_req814_index_has_all_work_views() -> None:
+    # Given die UI When geladen Then alle 7 Arbeitsbereiche existieren
+    # (6 Java-Tabs + Projektdaten als app-spezifischer Tab)
     html = _read("index.html")
     for view in VIEWS:
         assert f'href="#/{view}"' in html, f"Nav-Link #{view} fehlt"

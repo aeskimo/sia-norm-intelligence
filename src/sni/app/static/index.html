@@ -16,6 +16,7 @@
         <a class="nav-item" href="#/norms">Meine Normen</a>
         <a class="nav-item" href="#/assistant">Normenassistent</a>
         <a class="nav-item" href="#/intelligence">Norm Intelligence</a>
+        <a class="nav-item" href="#/projectdata">Projektdaten</a>
         <a class="nav-item" href="#/models">Lokale Modelle</a>
         <a class="nav-item" href="#/settings">Einstellungen</a>
       </nav>
@@ -179,25 +180,30 @@
                 <button type="button" class="btn btn-sm" id="intel-reject" disabled>Ablehnen</button>
               </div>
             </div>
-            <div class="card">
-              <h2 class="card-title">Projektdaten-Prüfung (approved Regeln, REQ-501)</h2>
-              <div class="form-actions">
-                <button type="button" class="btn" id="intel-preset">Beispielwerte (Synthetik)</button>
-                <label class="btn file-btn">CSV/IFC laden…
-                  <input type="file" id="intel-file" accept=".csv,.txt,.ifc" hidden>
-                </label>
-                <button type="button" class="btn" id="intel-row-add">+ Zeile</button>
-                <button type="button" class="btn" id="intel-row-del">− Zeile</button>
-              </div>
-              <div id="intel-project" class="table-wrap"></div>
-              <div class="form-actions">
-                <button type="button" class="btn btn-accent" id="intel-check">Prüfen</button>
-                <button type="button" class="btn" id="intel-bcf">BCF speichern…</button>
-                <button type="button" class="btn" id="intel-ids">IDS speichern…</button>
-              </div>
-              <pre id="intel-check-report" class="intel-report" hidden></pre>
-            </div>
           </div>
+        </div>
+        <div class="status-row" aria-live="polite"><span class="status-dot neutral" aria-hidden="true"></span><span class="status-text">Bereit.</span></div>
+      </section>
+
+      <section class="view" id="view-projectdata" data-view="projectdata" hidden>
+        <h1>Projektdaten</h1>
+        <div class="card">
+          <h2 class="card-title">Projektdaten-Prüfung (approved Regeln, REQ-501)</h2>
+          <div class="form-actions">
+            <button type="button" class="btn" id="intel-preset">Beispielwerte (Synthetik)</button>
+            <label class="btn file-btn">CSV/IFC laden…
+              <input type="file" id="intel-file" accept=".csv,.txt,.ifc" hidden>
+            </label>
+            <button type="button" class="btn" id="intel-row-add">+ Zeile</button>
+            <button type="button" class="btn" id="intel-row-del">− Zeile</button>
+          </div>
+          <div id="intel-project" class="table-wrap"></div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-accent" id="intel-check">Prüfen</button>
+            <button type="button" class="btn" id="intel-bcf">BCF speichern…</button>
+            <button type="button" class="btn" id="intel-ids">IDS speichern…</button>
+          </div>
+          <pre id="intel-check-report" class="intel-report" hidden></pre>
         </div>
         <div class="status-row" aria-live="polite"><span class="status-dot neutral" aria-hidden="true"></span><span class="status-text">Bereit.</span></div>
       </section>
