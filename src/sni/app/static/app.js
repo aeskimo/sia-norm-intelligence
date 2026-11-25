@@ -769,6 +769,21 @@
         );
       })
       .join("");
+    updateWorksetSaveButton();
+  }
+
+  /* Markierte Dokumente in das gewählte Arbeitsset speichern
+     (PUT /v1/worksets/{name} — Dokument-Liste ersetzen). Ohne diesen
+     Weg wären per UI angelegte Arbeitssets immer leer. */
+  function updateWorksetSaveButton() {
+    const row = $("workset-save-row");
+    const scope = $("workset-scope").value;
+    const count = assistantState.checkedDocs.size;
+    row.hidden = !(scope && count > 0);
+    if (!row.hidden) {
+      $("workset-save").textContent =
+        count + " markierte(r) Dokument(e) als «" + scope + "» speichern";
+    }
   }
 
   async function refreshAssistant() {
@@ -784,6 +799,7 @@
       $("workset-scope").innerHTML =
         '<option value="">(kein Arbeitsset)</option>';
       $("workset-list").innerHTML = "";
+      updateWorksetSaveButton();
       return;
     }
     try {
@@ -808,6 +824,32 @@
       assistantState.checkedDocs.add(id);
     } else {
       assistantState.checkedDocs.delete(id);
+    }
+    updateWorksetSaveButton();
+  });
+
+  $("workset-scope").addEventListener("change", updateWorksetSaveButton);
+
+  $("workset-save").addEventListener("click", async function () {
+    const name = $("workset-scope").value;
+    if (!name || !assistantState.checkedDocs.size) {
+      return;
+    }
+    try {
+      await apiJson("/v1/worksets/" + encodeURIComponent(name), {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ document_ids: Array.from(assistantState.checkedDocs) })
+      });
+      $("workset-message").textContent =
+        "Arbeitsset gespeichert: " +
+        name +
+        " (" +
+        assistantState.checkedDocs.size +
+        " Dokumente).";
+      await refreshAssistant();
+    } catch (err) {
+      $("workset-message").textContent = "Speichern fehlgeschlagen: " + err.message;
     }
   });
 

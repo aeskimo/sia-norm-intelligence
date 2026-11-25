@@ -115,6 +115,18 @@ def test_req814_assistant_shows_analyze_hint_when_nothing_rag_ready() -> None:
     assert "isRagReady" in js.split("renderAssistantDocs")[1].split("function ")[0]
 
 
+def test_req814_workset_document_assignment() -> None:
+    # Given Arbeitssets sind Scope-Gruppen mit Dokument-Liste
+    # (PUT /v1/worksets/{name}) When die UI geprüft Then gibt es einen
+    # Weg, markierte Dokumente in das gewählte Arbeitsset zu speichern
+    # — ohne diesen blieben per UI angelegte Sets immer leer.
+    html = _read("index.html")
+    js = _read("app.js")
+    assert 'id="workset-save"' in html, "Arbeitsset-Speichern fehlt in der UI"
+    assert "updateWorksetSaveButton" in js
+    assert 'method: "PUT"' in js and "document_ids" in js
+
+
 def test_req814_assistant_has_model_dropdown() -> None:
     # Given das Antwortmodell pro Ansicht wählbar sein soll (User-Wunsch)
     # When die UI geprüft Then trägt die Assistent-View ein Antwortmodell-
