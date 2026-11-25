@@ -300,7 +300,7 @@ jobs:
           mkdir -p build/appimage
           cat > build/appimage/AppRun <<'APPRUN'
           #!/bin/sh
-          exec "$APPDIR/SIA-Normenassistent" "$@"
+          exec "$APPDIR/SIA-Normenassistent/SIA-Normenassistent" "$@"
           APPRUN
           chmod +x build/appimage/AppRun
           cp packaging/sia-normenassistent.desktop build/appimage/

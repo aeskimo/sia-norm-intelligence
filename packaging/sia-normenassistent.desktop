@@ -2,7 +2,7 @@
 Type=Application
 Name=SIA-Normenassistent
 Comment=SIA-Normenassistent (Consumer, M8.6)
-Exec=SIA-Normenassistent
+Exec=SIA-Normenassistent/SIA-Normenassistent
 Icon=SIA-Normenassistent
 Terminal=false
 Categories=Office;
