@@ -98,6 +98,19 @@ def test_req809_list_queue_missing_dir_is_empty(tmp_path: Path) -> None:
     assert list_queue(tmp_path / "nichts") == ([], [])
 
 
+def test_req809_default_dirs_use_repo_root() -> None:
+    """Regression: ROOT muss der Repo-Root sein wie in allen Kern-Modulen.
+
+    Buggy ``parents[2]`` (statt ``parents[3]``) zeigte auf ``src/data/`` —
+    dann findet die App in der Praxis weder Queue noch extracted-Verzeichnis.
+    """
+    from sni.api import main as core_api
+
+    assert review_service.ROOT == core_api.ROOT
+    assert review_service.DEFAULT_QUEUE_DIR == core_api.ROOT / "data" / "review_queue"
+    assert review_service.DEFAULT_EXTRACTED_DIR == core_api.ROOT / "data" / "extracted"
+
+
 # ------------------------------------------------------------- Service: Freigabe
 
 

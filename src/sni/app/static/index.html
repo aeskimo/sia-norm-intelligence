@@ -129,9 +129,71 @@
 
       <section class="view" id="view-intelligence" data-view="intelligence" hidden>
         <h1>Norm Intelligence</h1>
-        <div class="card">
-          <h2 class="card-title">Deterministische Normfragen</h2>
-          <p class="muted">In M8.5: Aussageklasse, Claims, Fundstellen, Review-Queue, Projektdaten.</p>
+        <div class="intel-layout">
+          <div class="intel-west">
+            <div class="card">
+              <h2 class="card-title">Normfrage</h2>
+              <textarea id="intel-question" class="ask-question" rows="2"
+                placeholder="z. B.: Welcher Feuerwiderstand ist für tragende Bauteile vorgegeben?"></textarea>
+              <div class="form-actions">
+                <button type="button" class="btn btn-accent" id="intel-ask">Fragen (deterministisch)</button>
+              </div>
+            </div>
+            <div class="card" id="intel-answer-card" hidden>
+              <h2 class="card-title">Antwort (deterministisch, mit Fundstelle)</h2>
+              <p id="intel-answer-class" aria-live="polite"></p>
+              <div id="intel-answer-text" class="answer-text"></div>
+              <ul id="intel-claims" class="intel-claims" hidden></ul>
+              <h3 class="sources-title" id="intel-sources-title" hidden>Fundstellen</h3>
+              <ul id="intel-sources" class="answer-sources"></ul>
+              <p id="intel-answer-disclaimer" class="muted"></p>
+            </div>
+          </div>
+          <div class="intel-east">
+            <div class="card">
+              <h2 class="card-title">Semantik-Export (Normtext → Kandidaten)</h2>
+              <div class="form-actions">
+                <select id="intel-export-norm" aria-label="Norm für den Semantik-Export">
+                  <option value="">(keine indexierte Norm)</option>
+                </select>
+                <button type="button" class="btn btn-accent" id="intel-export">document.json erzeugen + Ingest</button>
+              </div>
+              <pre id="intel-export-report" class="intel-report" hidden></pre>
+            </div>
+            <div class="card">
+              <h2 class="card-title">Review-Queue (Kandidaten freigeben, G3)</h2>
+              <div class="form-actions">
+                <button type="button" class="btn" id="intel-queue-reload">Queue neu laden</button>
+              </div>
+              <ul id="intel-queue-list" class="intel-queue-list"></ul>
+              <pre id="intel-queue-detail" class="intel-detail" hidden></pre>
+              <div class="form-actions">
+                <label class="inline-label" for="intel-reviewer">Von:</label>
+                <input id="intel-reviewer" class="inline-input" autocomplete="name"
+                  placeholder="Freigabeperson (leer = Einstellungen)">
+                <button type="button" class="btn btn-sm" id="intel-approve" disabled>Freigeben</button>
+                <button type="button" class="btn btn-sm" id="intel-reject" disabled>Ablehnen</button>
+              </div>
+            </div>
+            <div class="card">
+              <h2 class="card-title">Projektdaten-Prüfung (approved Regeln, REQ-501)</h2>
+              <div class="form-actions">
+                <button type="button" class="btn" id="intel-preset">Beispielwerte (Synthetik)</button>
+                <label class="btn file-btn">CSV/IFC laden…
+                  <input type="file" id="intel-file" accept=".csv,.txt,.ifc" hidden>
+                </label>
+                <button type="button" class="btn" id="intel-row-add">+ Zeile</button>
+                <button type="button" class="btn" id="intel-row-del">− Zeile</button>
+              </div>
+              <div id="intel-project" class="table-wrap"></div>
+              <div class="form-actions">
+                <button type="button" class="btn btn-accent" id="intel-check">Prüfen</button>
+                <button type="button" class="btn" id="intel-bcf">BCF speichern…</button>
+                <button type="button" class="btn" id="intel-ids">IDS speichern…</button>
+              </div>
+              <pre id="intel-check-report" class="intel-report" hidden></pre>
+            </div>
+          </div>
         </div>
         <div class="status-row" aria-live="polite"><span class="status-dot neutral" aria-hidden="true"></span><span class="status-text">Bereit.</span></div>
       </section>

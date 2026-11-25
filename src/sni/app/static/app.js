@@ -879,6 +879,634 @@
     }
   });
 
+  /* --- Norm Intelligence (M8.5, REQ-811/812) ----------------------------------
+      1:1 Java IntelligencePanel: Normfrage → deterministische Antwort
+      (Aussageklasse-Chip, Claims, Fundstellen, Disclaimer), Semantik-Export,
+      Review-Queue (Freigeben/Ablehnen, G3) und Projektdaten-Prüfung
+      (pass/fail/insufficient_data, BCF/IDS-Export). */
+
+  const intelState = {
+    queue: { candidates: [], gaps: [] },
+    queueSelection: null,
+    queueSelectionIsGap: true,
+    projectRows: [{ concept: "", value: "", unit: "" }]
+  };
+
+  function intelStatus(kind, text) {
+    setStatus($("view-intelligence"), kind, text);
+  }
+
+  function showIntelReport(id, text) {
+    const el = $(id);
+    el.textContent = text;
+    el.hidden = false;
+    el.scrollTop = 0;
+  }
+
+  /* --- 1) Normfrage → Antwort (REQ-811) -------------------------------------- */
+
+  function intelClassChip(cls) {
+    // 1:1 Java SiaDesign.classColor
+    const map = {
+      normativ_belegt: "chip-success",
+      abgeleitet: "chip-accent",
+      fachliche_interpretation: "chip-warning",
+      projektfestlegung: "chip-warning",
+      nicht_eindeutig: "chip-error"
+    };
+    return (
+      '<span class="chip ' + (map[cls] || "") + '">Aussageklasse: ' +
+      esc(cls || "unbekannt") + "</span>"
+    );
+  }
+
+  function intelFormatSource(s) {
+    // 1:1 Java formatSource
+    let out = String(s.norm || "");
+    if (s.edition != null && String(s.edition).trim()) out += ":" + s.edition;
+    if (s.clause != null && String(s.clause).trim()) out += "  Ziffer " + s.clause;
+    if (s.table != null && String(s.table).trim()) out += "  Tabelle " + s.table;
+    if (s.formula != null && String(s.formula).trim()) out += "  Formel " + s.formula;
+    if (s.page != null) out += "  Seite " + s.page;
+    if (s.verified === true) out += "  [verifiziert]";
+    return out;
+  }
+
+  $("intel-ask").addEventListener("click", async function () {
+    const question = $("intel-question").value.trim();
+    if (!question) {
+      intelStatus("error", "Frage eingeben.");
+      return;
+    }
+    $("intel-ask").disabled = true;
+    $("intel-ask").textContent = "Wird beantwortet …";
+    $("intel-answer-card").hidden = false;
+    $("intel-answer-class").innerHTML = "";
+    $("intel-answer-text").textContent = "";
+    $("intel-claims").hidden = true;
+    $("intel-claims").innerHTML = "";
+    $("intel-sources-title").hidden = true;
+    $("intel-sources").innerHTML = "";
+    $("intel-answer-disclaimer").textContent = "";
+    try {
+      const data = await apiJson("/v1/answer", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ question: question })
+      });
+      const cls = data.answer_class || "unbekannt";
+      $("intel-answer-class").innerHTML = intelClassChip(cls);
+      $("intel-answer-text").textContent = data.text || "";
+      const claims = data.claims || [];
+      if (claims.length) {
+        $("intel-claims").innerHTML = claims
+          .map(function (cl) {
+            return (
+              "<li>" + esc(cl.claim || "") +
+              (cl.verified ? "  [verifiziert]" : "  [nicht verifiziert]") +
+              "</li>"
+            );
+          })
+          .join("");
+        $("intel-claims").hidden = false;
+      }
+      const sources = data.sources || [];
+      if (sources.length) {
+        $("intel-sources-title").hidden = false;
+        $("intel-sources").innerHTML = sources
+          .map(function (s) {
+            return (
+              '<li class="source-item"><div class="source-cite"><span>' +
+              esc(intelFormatSource(s)) + "</span></div></li>"
+            );
+          })
+          .join("");
+      }
+      $("intel-answer-disclaimer").textContent = data.disclaimer || "";
+      intelStatus("success", "Antwort erhalten. Aussageklasse: " + cls);
+    } catch (err) {
+      intelStatus("error", "Antwort fehlgeschlagen: " + err.message);
+    } finally {
+      $("intel-ask").disabled = false;
+      $("intel-ask").textContent = "Fragen (deterministisch)";
+    }
+  });
+
+  /* --- 2) Semantik-Export (REQ-812, 1:1 runExport) --------------------------- */
+
+  async function refreshIntelNorms() {
+    if (!state.loggedIn) {
+      return;
+    }
+    const select = $("intel-export-norm");
+    try {
+      const docs = await apiJson("/v1/documents");
+      const ready = docs.filter(function (d) {
+        return d.status === "FULLTEXT_READY" || d.status === "HYBRID_READY";
+      });
+      const current = select.value;
+      select.innerHTML =
+        '<option value="">(keine indexierte Norm)</option>' +
+        ready
+          .map(function (d) {
+            return (
+              '<option value="' + esc(d.product_id) + '">' +
+              esc(d.number) + " " + esc(d.title) + "</option>"
+            );
+          })
+          .join("");
+      if (
+        ready.some(function (d) {
+          return d.product_id === current;
+        })
+      ) {
+        select.value = current;
+      }
+    } catch (err) {
+      /* Auswahl behalten */
+    }
+  }
+
+  $("intel-export").addEventListener("click", async function () {
+    const productId = $("intel-export-norm").value;
+    if (!productId) {
+      intelStatus("error", "Norm für den Export auswählen (indexierte Normen).");
+      return;
+    }
+    $("intel-export").disabled = true;
+    $("intel-export").textContent = "Export läuft …";
+    try {
+      const data = await apiJson("/v1/ingest/semantic-export", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ norm_id: productId })
+      });
+      const lines = [
+        "[Export] " + (data.candidates || []).length + " Kandidat(en), " +
+          (data.skipped || []).length + " übersprungen, " +
+          (data.gaps || []).length + " Gaps – Norm: " + data.norm_id
+      ];
+      (data.candidates || []).forEach(function (id) {
+        lines.push(" - Kandidat: " + id);
+      });
+      (data.skipped || []).forEach(function (reason) {
+        lines.push(" - übersprungen: " + reason);
+      });
+      (data.gaps || []).forEach(function (id) {
+        lines.push(" - Gap: " + id);
+      });
+      showIntelReport("intel-export-report", lines.join("\n"));
+      intelStatus("success", "Export + Ingest fertig – Kandidaten stehen in der Review-Queue.");
+      refreshIntelQueue();
+    } catch (err) {
+      intelStatus("error", "Export fehlgeschlagen: " + err.message);
+    } finally {
+      $("intel-export").disabled = false;
+      $("intel-export").textContent = "document.json erzeugen + Ingest";
+    }
+  });
+
+  /* --- 3) Review-Queue (REQ-812, 1:1 loadQueue/showQueueDetail) --------------- */
+
+  async function refreshIntelQueue() {
+    try {
+      const data = await apiJson("/v1/review/queue");
+      intelState.queue = {
+        candidates: data.candidates || [],
+        gaps: data.gaps || []
+      };
+      renderIntelQueue();
+    } catch (err) {
+      intelStatus("error", "Queue nicht lesbar: " + err.message);
+    }
+  }
+
+  $("intel-queue-reload").addEventListener("click", refreshIntelQueue);
+
+  function intelQueueItems() {
+    return intelState.queue.candidates.concat(intelState.queue.gaps);
+  }
+
+  function intelIsGap(id) {
+    return String(id || "").indexOf("GAP-") === 0;
+  }
+
+  function intelQueueSummary(o) {
+    if (intelIsGap(o.id)) {
+      return String(o.gap_type || "");
+    }
+    const source = o.source || {};
+    let s = (source.norm || "") + ":" + (source.edition || "");
+    if (source.clause) s += "  Ziffer " + source.clause;
+    return s + " · " + (o.statement_type || "");
+  }
+
+  function renderIntelQueue() {
+    const items = intelQueueItems();
+    const list = $("intel-queue-list");
+    if (!items.length) {
+      list.innerHTML =
+        '<li class="muted intel-queue-empty">Review-Queue ist leer.</li>';
+    } else {
+      list.innerHTML = items
+        .map(function (o) {
+          const id = String(o.id || "");
+          const selected = intelState.queueSelection === id ? " selected" : "";
+          return (
+            '<li class="intel-queue-item' + selected + '" data-queue-id="' +
+            esc(id) + '"><span>' + esc(id) + "</span>" +
+            '<span class="muted">' + esc(intelQueueSummary(o)) + "</span></li>"
+          );
+        })
+        .join("");
+    }
+    showIntelQueueDetail();
+  }
+
+  function showIntelQueueDetail() {
+    const detail = $("intel-queue-detail");
+    const id = intelState.queueSelection;
+    const obj = id
+      ? intelQueueItems().filter(function (o) {
+          return String(o.id) === id;
+        })[0]
+      : undefined;
+    if (!obj) {
+      detail.hidden = true;
+      detail.textContent = "";
+      updateIntelQueueButtons();
+      return;
+    }
+    let lines;
+    if (intelIsGap(obj.id)) {
+      intelState.queueSelectionIsGap = true;
+      lines = [
+        "ID: " + obj.id,
+        "Typ: " + (obj.gap_type || ""),
+        "Ziel: " + (obj.target_layer || ""),
+        "",
+        String(obj.description || "")
+      ];
+      if (obj.proposal) lines.push("", "Vorschlag: " + obj.proposal);
+      const evidence = (obj.evidence || []).map(String);
+      if (evidence.length) lines.push("", "Beleg: " + evidence.join(", "));
+      lines.push(
+        "",
+        "(GapReports werden nicht freigegeben – sie dokumentieren fehlende Konzepte/Daten.)"
+      );
+    } else {
+      intelState.queueSelectionIsGap = false;
+      const source = obj.source || {};
+      lines = [
+        "ID: " + obj.id,
+        "Norm: " + (source.norm || "") + ":" + (source.edition || "") +
+          (source.clause ? ", Ziffer " + source.clause : "") +
+          (source.table ? " (Tabelle " + source.table + ")" : ""),
+        "Klasse: " + (obj.statement_type || "") +
+          "  |  Obligation: " + (obj.obligation || ""),
+        "Review-Status: " + (obj.review_status || ""),
+        "Konzepte: " + (obj.concepts || []).join(", "),
+        "Fundstelle verifiziert: " + (source.verified === true ? "ja" : "nein (G6)"),
+        "",
+        "Zusammenfassung: " + (obj.summary || "")
+      ];
+    }
+    detail.hidden = false;
+    detail.textContent = lines.join("\n");
+    updateIntelQueueButtons();
+  }
+
+  function updateIntelQueueButtons() {
+    const hasSelection = intelState.queueSelection !== null;
+    $("intel-approve").disabled = !(hasSelection && !intelState.queueSelectionIsGap);
+    $("intel-reject").disabled = !hasSelection;
+  }
+
+  $("intel-queue-list").addEventListener("click", function (event) {
+    const item = event.target.closest("li[data-queue-id]");
+    if (!item) {
+      return;
+    }
+    intelState.queueSelection = item.getAttribute("data-queue-id");
+    renderIntelQueue();
+  });
+
+  function intelReviewPath(action, id) {
+    return (
+      "/v1/review/" + id.split("/").map(encodeURIComponent).join("/") + "/" + action
+    );
+  }
+
+  $("intel-approve").addEventListener("click", async function () {
+    const id = intelState.queueSelection;
+    if (!id || intelState.queueSelectionIsGap) {
+      return;
+    }
+    const approver = $("intel-reviewer").value.trim();
+    const body = JSON.stringify(approver ? { approved_by: approver } : {});
+    try {
+      const data = await apiJson(intelReviewPath("approve", id), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: body
+      });
+      intelStatus("success", "Freigegeben: " + data.id +
+        " (" + data.approved_by + ", " + data.approved_at + ")");
+      refreshIntelQueue();
+    } catch (err) {
+      if (!approver && err.message.indexOf("Keine Freigabeperson") === 0) {
+        // G3: Freigabeperson einmalig nachfragen und in den Settings speichern.
+        const name = window.prompt(
+          "Keine Freigabeperson konfiguriert (G3). Name der Freigabeperson:"
+        );
+        if (name && name.trim()) {
+          try {
+            await apiJson("/v1/settings", {
+              method: "PUT",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ approval_name: name.trim() })
+            });
+            $("intel-reviewer").value = name.trim();
+            const data = await apiJson(intelReviewPath("approve", id), {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: body
+            });
+            intelStatus("success", "Freigegeben: " + data.id +
+              " (" + data.approved_by + ", " + data.approved_at + ")");
+            refreshIntelQueue();
+            return;
+          } catch (err2) {
+            err = err2;
+          }
+        }
+      }
+      intelStatus("error", "Freigabe fehlgeschlagen: " + err.message);
+    }
+  });
+
+  $("intel-reject").addEventListener("click", async function () {
+    const id = intelState.queueSelection;
+    if (!id) {
+      return;
+    }
+    try {
+      await apiJson(intelReviewPath("reject", id), { method: "POST" });
+      intelStatus("success", "Ablehnen: " + id + " aus der Queue entfernt.");
+      intelState.queueSelection = null;
+      refreshIntelQueue();
+    } catch (err) {
+      intelStatus("error", "Ablehnen fehlgeschlagen: " + err.message);
+    }
+  });
+
+  /* --- 4) Projektdaten-Prüfung (REQ-812, 1:1 projectData/runCheck/BCF/IDS) ----- */
+
+  function renderIntelProject() {
+    $("intel-project").innerHTML =
+      '<table class="intel-project-table"><thead><tr>' +
+      "<th>Konzept</th><th>Wert</th><th>Einheit</th></tr></thead><tbody>" +
+      intelState.projectRows
+        .map(function (r, i) {
+          return (
+            "<tr>" +
+            '<td><input data-pi="' + i + '" data-pk="concept" value="' +
+            esc(r.concept) + '" placeholder="sia:concept/…" aria-label="Konzept">' +
+            '</td><td><input data-pi="' + i + '" data-pk="value" value="' +
+            esc(r.value) + '" inputmode="decimal" aria-label="Wert">' +
+            '</td><td><input data-pi="' + i + '" data-pk="unit" value="' +
+            esc(r.unit) + '" placeholder="m2" aria-label="Einheit"></td></tr>'
+          );
+        })
+        .join("") +
+      "</tbody></table>";
+  }
+
+  $("intel-project").addEventListener("input", function (event) {
+    const input = event.target.closest("input[data-pi]");
+    if (!input) {
+      return;
+    }
+    const row = intelState.projectRows[Number(input.getAttribute("data-pi"))];
+    if (row) {
+      row[input.getAttribute("data-pk")] = input.value;
+    }
+  });
+
+  $("intel-preset").addEventListener("click", function () {
+    // 1:1 Java fillPresetData
+    intelState.projectRows = [
+      { concept: "sia:concept/teilsflaeche-a", value: "100", unit: "m2" },
+      { concept: "sia:concept/teilsflaeche-b", value: "50", unit: "m2" },
+      { concept: "sia:concept/gesamtflaeche", value: "150", unit: "m2" }
+    ];
+    renderIntelProject();
+    intelStatus("success", "Beispielwerte (Synthetik) geladen.");
+  });
+
+  $("intel-row-add").addEventListener("click", function () {
+    intelState.projectRows.push({ concept: "", value: "", unit: "" });
+    renderIntelProject();
+  });
+
+  $("intel-row-del").addEventListener("click", function () {
+    if (intelState.projectRows.length > 1) {
+      intelState.projectRows.pop();
+    } else {
+      intelState.projectRows = [{ concept: "", value: "", unit: "" }];
+    }
+    renderIntelProject();
+  });
+
+  $("intel-file").addEventListener("change", async function () {
+    const file = this.files && this.files[0];
+    if (!file) {
+      return;
+    }
+    const form = new FormData();
+    form.append("file", file);
+    try {
+      const data = await apiJson("/v1/projectdata", { method: "POST", body: form });
+      const values = data.values || [];
+      intelState.projectRows = values.map(function (v) {
+        return {
+          concept: String(v.concept),
+          value: String(v.value),
+          unit: String(v.unit || "")
+        };
+      });
+      renderIntelProject();
+      intelStatus("success", "Projektdaten geladen: " + values.length +
+        " Wert(e) aus " + (data.file || file.name));
+    } catch (err) {
+      intelStatus("error", "Upload fehlgeschlagen: " + err.message);
+    } finally {
+      this.value = "";
+    }
+  });
+
+  function intelProjectData() {
+    // 1:1 Java projectData (Validierung)
+    const data = {};
+    intelState.projectRows.forEach(function (r, i) {
+      const concept = String(r.concept || "").trim();
+      const value = String(r.value || "").trim();
+      const unit = String(r.unit || "").trim();
+      if (!concept && !value && !unit) return;
+      if (!concept || !value || !unit) {
+        throw new Error(
+          "Zeile " + (i + 1) +
+          ": Konzept, Wert und Einheit füllen (oder Zeile leer lassen)."
+        );
+      }
+      const v = Number(value.replace(",", "."));
+      if (Number.isNaN(v)) {
+        throw new Error("Zeile " + (i + 1) + ": Wert ist keine Zahl: " + value);
+      }
+      if (data[concept] !== undefined) {
+        throw new Error("Konzept mehrfach vorhanden: " + concept);
+      }
+      data[concept] = { value: v, unit: unit };
+    });
+    return data;
+  }
+
+  function intelRenderCheck(r) {
+    // 1:1 Java renderCheck
+    let pass = 0;
+    let fail = 0;
+    let missing = 0;
+    const lines = [];
+    (r.checks || []).forEach(function (c) {
+      let tag;
+      if (c.status === "pass") {
+        pass++;
+        tag = "[pass] ";
+      } else if (c.status === "fail") {
+        fail++;
+        tag = "[fail] ";
+      } else {
+        missing++;
+        tag = "[insufficient_data] ";
+      }
+      lines.push(tag + c.rule_id);
+      lines.push("   " + (c.reason || ""));
+      if (c.value !== null && c.value !== undefined) {
+        lines.push("   Regelwert: " + c.value + (c.unit ? " " + c.unit : ""));
+      }
+      if (c.claimed !== null && c.claimed !== undefined) {
+        lines.push("   Projektwert: " + c.claimed);
+      }
+      if ((c.missing_inputs || []).length) {
+        lines.push("   Fehlend: " + c.missing_inputs.join(", "));
+      }
+      if ((c.derived_from || []).length) {
+        lines.push("   Fundstelle: " + c.derived_from.join(", "));
+      }
+    });
+    if (!(r.checks || []).length) {
+      lines.push("Keine approved Regeln vorhanden (Regeln: data/rules/).");
+    }
+    if ((r.gaps || []).length) {
+      lines.push("Gaps:");
+      (r.gaps || []).forEach(function (g) {
+        lines.push(" - " + g.id + " (" + g.gap_type + "): " + g.description);
+      });
+    }
+    if (r.disclaimer) lines.push("", r.disclaimer);
+    return { text: lines.join("\n"), pass: pass, fail: fail, missing: missing };
+  }
+
+  $("intel-check").addEventListener("click", async function () {
+    let data;
+    try {
+      data = intelProjectData();
+    } catch (err) {
+      intelStatus("error", "Projektdaten: " + err.message);
+      return;
+    }
+    $("intel-check").disabled = true;
+    $("intel-check").textContent = "Prüfe …";
+    try {
+      const r = await apiJson("/v1/check", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ project_data: data })
+      });
+      const report = intelRenderCheck(r);
+      showIntelReport("intel-check-report", report.text);
+      intelStatus("success", "Prüfung abgeschlossen: " + (r.checks || []).length +
+        " Regel(n) – " + report.pass + " pass, " + report.fail + " fail, " +
+        report.missing + " insufficient_data");
+    } catch (err) {
+      intelStatus("error", "Prüfung fehlgeschlagen: " + err.message);
+    } finally {
+      $("intel-check").disabled = false;
+      $("intel-check").textContent = "Prüfen";
+    }
+  });
+
+  async function intelDownload(url, body, filename) {
+    const res = await apiFetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      let detail = "HTTP " + res.status;
+      try {
+        const d = await res.json();
+        if (d.error) detail = d.error;
+      } catch (err) {
+        /* Standardmeldung behalten */
+      }
+      throw new Error(detail);
+    }
+    const blob = await res.blob();
+    const a = document.createElement("a");
+    const href = URL.createObjectURL(blob);
+    a.href = href;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(function () {
+      URL.revokeObjectURL(href);
+    }, 10000);
+    return blob.size;
+  }
+
+  $("intel-bcf").addEventListener("click", async function () {
+    let data;
+    try {
+      data = intelProjectData();
+    } catch (err) {
+      intelStatus("error", "Projektdaten: " + err.message);
+      return;
+    }
+    try {
+      const size = await intelDownload(
+        "/v1/export/bcf",
+        { project_data: data },
+        "sni-checks.bcf"
+      );
+      intelStatus("success", "BCF gespeichert: sni-checks.bcf (" + size + " Bytes)");
+    } catch (err) {
+      intelStatus("error", "BCF-Export fehlgeschlagen: " + err.message);
+    }
+  });
+
+  $("intel-ids").addEventListener("click", async function () {
+    try {
+      await intelDownload("/v1/export/ids", {}, "sni-ids.json");
+      intelStatus("success", "IDS gespeichert: sni-ids.json");
+    } catch (err) {
+      intelStatus("error", "IDS-Export fehlgeschlagen: " + err.message);
+    }
+  });
+
+  renderIntelProject();
+
   /* --- Statuszeile + Polling --------------------------------------------------- */
 
   /* --- Statuszeile: semantische Klassifikation ----------------------------
@@ -923,6 +1551,10 @@
     }
     if (view === "assistant") {
       refreshAssistant();
+    }
+    if (view === "intelligence") {
+      refreshIntelNorms();
+      refreshIntelQueue();
     }
     if (view === "models") {
       refreshModels();

@@ -28,7 +28,7 @@ from jsonschema.validators import Draft202012Validator
 
 from sni.core.schemas import make_validator
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_QUEUE_DIR = ROOT / "data" / "review_queue"
 DEFAULT_EXTRACTED_DIR = ROOT / "data" / "extracted"
 
