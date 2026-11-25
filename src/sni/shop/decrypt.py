@@ -8,7 +8,13 @@ nicht änderbar (shop.sia.ch, SIA-Reader 2, Bytecode 2015):
   statischem 2015er-Schlüssel → Klartext-XML (Root: dsSecureReaderLizenz).
 - ``SRD_KEY``/``SRD_IV`` im Lizenz-XML:
   ``Base64(DES_static(echter 8-Byte-Key/IV))``; Unwrap = Base64-Decode +
-  DES-Entschlüsselung mit dem statischen Schlüssel.
+  DES-Entschlüsselung mit dem statischen Schlüssel. Der Klartext wird
+  Java-1:1 mit ``new String(plain, US_ASCII)`` gelesen: Bytes ≥ 0x80 werden
+  stillschweigend durch ``?`` (0x3F) ersetzt und sind KEIN Fehler
+  (Produktionsbefund 25.11.2026: der individuelle Schlüssel eines realen
+  Kunden enthält ein nicht-ASCII-Byte; die Java-Referenz liest die PDFs
+  korrekt mit dem ``?``-ersetzen Schlüssel — die Legacy-Pipeline verwendet
+  durchgängig diese Semantik).
 - ``.srd`` (Dokumentdatei): ZIP (1 XML-Eintrag) → Metadaten plus
   ``Orig_Dokument_Crypted`` = ``Base64(DES_individuell(Dokument))`` →
   PDF-Bytes.
@@ -86,15 +92,24 @@ def des_cbc_decrypt(data: bytes, key: str, iv: str) -> bytes:
 
 
 def unwrap_srd_value(wrapped_b64: str) -> str:
-    """Entpackt ein SRD_KEY-/SRD_IV-Feld (Java: ``SrdKeyUnwrapper.unwrap``)."""
+    """Entpackt ein SRD_KEY-/SRD_IV-Feld (Java: ``SrdKeyUnwrapper.unwrap``).
+
+    Klartext-Semantik Java-1:1: ``new String(plain, US_ASCII)`` — Bytes
+    ≥ 0x80 werden stillschweigend zu ``?`` (0x3F), es wird nie wegen
+    nicht-ASCII-Klartext geworfen. Verifikation 25.11.2026 gegen das
+    Produktivportal: Java- und Python-Client erhalten byte-identisches
+    Material (Ciphertext- und Klartext-SHA-256 deckungsgleich), die
+    Output-Bytes der echten Java-``unwrap()`` und dieser Mapping-Regel
+    sind hash-identisch; die Java-Referenz entschlüsselt die PDFs korrekt
+    mit dem ``?``-ersetzen Schlüssel.
+    """
     try:
         encoded = base64.b64decode(wrapped_b64.strip(), validate=True)
     except (binascii.Error, ValueError) as exc:
         raise SiaShopError("SRD_KEY/SRD_IV: ungültiges Base64") from exc
-    plain = des_cbc_decrypt(encoded, LEGACY_STATIC_KEY, LEGACY_STATIC_IV)
     try:
-        return plain.decode("ascii")
-    except UnicodeDecodeError as exc:
+        plain = des_cbc_decrypt(encoded, LEGACY_STATIC_KEY, LEGACY_STATIC_IV)
+    except SiaShopError as exc:
         # G4: nur Zählungen + Ciphertext-Fingerabdruck (SHA-256, 16 Hex) —
         # nie Schlüssel-Bytes. Der Ciphertext-Fingerabdruck erlaubt den
         # Vergleich zweier Lizenzen (z. B. Java-Login vs. Python-Login)
@@ -103,10 +118,10 @@ def unwrap_srd_value(wrapped_b64: str) -> str:
         # Materialausstellung (Gerät/Sitzung/Zeit abhängig).
         fingerprint = hashlib.sha256(encoded).hexdigest()[:16]
         raise SiaShopError(
-            "SRD_KEY/SRD_IV: Klartext nicht ASCII (Ciphertext: "
-            f"{len(encoded)} Bytes, Klartext: {len(plain)} Bytes, "
-            f"FPA {fingerprint}) — falscher Schlüssel/Format"
+            "SRD_KEY/SRD_IV: Entpackung fehlgeschlagen — falscher Schlüssel/Format"
+            f" (Ciphertext: {len(encoded)} Bytes, FPA {fingerprint})"
         ) from exc
+    return "".join(chr(b) if b < 0x80 else "?" for b in plain)
 
 
 def wrap_srd_value_for_testing(plaintext: str) -> str:

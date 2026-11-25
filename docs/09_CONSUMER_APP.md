@@ -424,6 +424,21 @@ Known-Answer-Test mit Java-Referenzwerten (Vektoren erzeugt von
 `.mro`/`.srd`-Fixtures — G4: keine echten Lizenzdateien) — grün auf
 cryptography 50.0.2 ohne Warnungen (`test_req801_des_kat.py`).
 
+**Leniente US-ASCII-Klartextsemantik (Produktionsbefund 2026-11-25):**
+`unwrap_srd_value` liest den DES-Klartext exakt wie die Java-Referenz:
+`new String(plain, US_ASCII)` — Bytes ≥ 0x80 werden stillschweigend zu
+`?` (0x3F) und sind **kein Fehler**. Nachgewiesen: Java- und
+Python-Client erhalten vom Produktivportal byte-identisches
+Schlüsselmaterial (Ciphertext- und Klartext-SHA-256 über beide Clients
+deckungsgleich, geräte-/zeitunabhängig), der individuelle Schlüssel des
+Testkunden enthält genau ein nicht-ASCII-Byte, und die Java-App
+entschlüsselt die Norm-PDFs korrekt mit dem `?`-ersetzen Schlüssel —
+die Legacy-Pipeline (Portal-PDF-Verschlüsselung + 2015er-Reader)
+verwendet durchgängig diese Semantik. Der frühe strikte ASCII-Check war
+eine Port-Abweichung und hat funktionierende Portal-Logins blockiert;
+die 1:1-Regel ist per KAT (KatGen2-Vektor, Output der echten
+Java-`unwrap()` per SHA-256 kreuzverifiziert) abgesichert.
+
 ## 11. Cross-Platform
 
 | Thema | macOS | Windows | Linux |

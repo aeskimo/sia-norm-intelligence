@@ -1,10 +1,20 @@
 """REQ-801: DES-Kette (SIA-Protokoll) — Known-Answer-Test gegen Java-Referenz.
 
-Die Vektoren wurden 2026-11-24 mit der Java-Referenzimplementierung
-(``ch.sia.reader.login.SrdKeyUnwrapper`` plus ``javax.crypto``
-``DES/CBC/PKCS5Padding``, JDK 25, ``KatGenerator``) erzeugt — reine
-synthetische Testdaten (G4: keine echten Lizenzschlüssel, keine
-Normtexte). Der Test sichert die Protokoll-Kompatibilität des 1:1-Ports:
+Vektoren (reine synthetische Testdaten, G4: keine echten Lizenzschlüssel,
+keine Normtexte), alle mit den 2015er-Referenzkonstanten und
+``DES/CBC/PKCS5Padding``:
+
+- Basisvektoren (2026-11-24): unabhängig mit OpenSSL 3 (legacy provider,
+  Single-DES) verifiziert — mit den Referenzkonstanten entschlüsseln sie
+  zu den erwarteten Klartexten.
+- Nicht-ASCII-Vektor (2026-11-25, ``KatGen2``, JDK-25 JCE): 8-Byte-Klartext
+  mit exakt einem Byte ≥ 0x80; Erwartungswert = Output der echten
+  Java-``SrdKeyUnwrapper.unwrap()`` (``new String(plain, US_ASCII)``,
+  stillschweigende ``?``-Ersetzung), per SHA-256-Fingerabdruck gegen den
+  Produktivportal-Login am 25.11.2026 kreuzverifiziert (Details:
+  09_CONSUMER_APP.md §10.5).
+
+Der Test sichert die Protokoll-Kompatibilität des 1:1-Ports:
 Die TripleDES-24-Byte-Implentation (``k + k + k`` ≡ Single DES,
 09_CONSUMER_APP.md §10.5) muss byte-identische Chiffretexte erzeugen.
 """
@@ -37,6 +47,11 @@ JAVA_WRAPPED_KEY = "HbRKxGMUEBo2yBaSjjLuaw=="
 JAVA_WRAPPED_IV = "S415B5c8Jq2orKXAs5octQ=="
 JAVA_REAL_KEY = "K3yABCDE"
 JAVA_REAL_IV = "IvFGHIJK"
+# Nicht-ASCII-KAT (KatGen2, JDK 25, 2026-11-25): Klartext
+# b"Ab3d\xC7x9Q" — exakt ein Byte >= 0x80. Java-Semantik:
+# new String(plain, US_ASCII) ersetzt es stillschweigend durch '?'.
+JAVA_WRAPPED_KEY_NONASCII = "N3oX/9NGdcfy7yzXyLWRPQ=="
+JAVA_LENIENT_KEY_NONASCII = "Ab3d?x9Q"
 JAVA_MRO = base64.b64decode(
     "UEsDBBQACAgIAEyjeF0AAAAAAAAAAAAAAAAdAAAAREVWLUtBVC0wMDAxX0xpemVuel9EYXRlaS5t"
     "cm8B4AAf/ydXsDbEaJlb+Q8gm5SNnzuFUC6O7BPXjSyMzGLOPjsyhVZ/iZrJY0axImp5lrP1hlDm"
@@ -133,18 +148,30 @@ def test_req801_unwrap_rejects_invalid_base64() -> None:
         unwrap_srd_value("definitely not base64!!!")
 
 
-def test_req801_unwrap_non_ascii_reports_sizes_only() -> None:
-    # Given ein Wrapped-Wert mit nicht-ASCII-Klartext (simuliert ein
-    # formatseitig verändertes Server-Wrapping) When entpackt Then enthält
-    # die Fehlermeldung nur die Zählungen (G4) — keine Schlüssel-Bytes.
+def test_req801_kat_unwrap_non_ascii_java_semantics() -> None:
+    # Produktionsbefund 25.11.2026: Der individuelle Schlüssel eines
+    # realen Portal-Kunden enthält genau ein nicht-ASCII-Byte. Die
+    # Java-Referenz (new String(plain, US_ASCII)) ersetzt es
+    # stillschweigend durch '?' — und mit genau dem '?'-ersetzen Schlüssel
+    # werden die Norm-PDFs korrekt entschlüsselt. Python muss 1:1 sein.
+    # Vektor: JDK-25 JCE (KatGen2); Erwartungswert = Output der echten
+    # Java-unwrap() (per SHA-256-Fingerabdruck kreuzverifiziert).
+    assert unwrap_srd_value(JAVA_WRAPPED_KEY_NONASCII) == JAVA_LENIENT_KEY_NONASCII
+
+
+def test_req801_unwrap_padding_failure_reports_fingerprint_only() -> None:
+    # Given ein Ciphertext mit gültigem Base64/Blocklänge, aber ungültigem
+    # PKCS5-Padding unter dem Referenzschlüssel (simuliert falscher
+    # Schlüssel/formatseitig verändertes Wrapping) When entpackt Then
+    # enthält die Fehlermeldung nur Zählung + Ciphertext-Fingerabdruck
+    # (G4) — keine Schlüssel-Bytes.
     wrapped = base64.b64encode(
-        des_cbc_encrypt(b"\x80\x81\x82\x83\x84\x85\x86\x87", LEGACY_STATIC_KEY, LEGACY_STATIC_IV)
+        des_cbc_encrypt(b"\x80\x81\x82\x83\x84\x85\x86\x87", "anderer0", "anderer1")
     ).decode("ascii")
     with pytest.raises(SiaShopError) as excinfo:
         unwrap_srd_value(wrapped)
     message = str(excinfo.value)
     assert "Ciphertext: 16 Bytes" in message
-    assert "Klartext: 8 Bytes" in message
     assert "\x80" not in message
     # Ciphertext-Fingerabdruck (SHA-256, 16 Hex) für Lizenz-Vergleiche (G4)
     assert re.search(r"FPA [0-9a-f]{16}\)", message)
