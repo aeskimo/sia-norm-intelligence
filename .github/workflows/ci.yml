@@ -56,6 +56,47 @@ jobs:
             # <3.59, weil 3.59 GLib >= 2.84 braucht (ubuntu-latest = 2.80).
             pip install "PyGObject<3.59"
           fi
+      - name: "P1-Probe: Gtk.Application activate unter Xvfb (ohne pywebview)"
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          # Binary-Such: feuert ``activate`` bei einem plainen Gtk.Application
+          # (exakt pywebview-Form, ohne Abstraktion)? Isoliert GHA-Umgebung
+          # vs. pywebview-Code vs. PyInstaller-Bundle.
+          python3 -c "import gi; print('[P1] gi-Import OK')"
+          set +e
+          timeout 60 xvfb-run --auto-servernum python3 packaging/ci_gtk_probe.py
+          rc=$?
+          set -e
+          if [ "$rc" -eq 0 ]; then
+            echo "P1 OK: activate feuert unter Xvfb — Umgebung ist nicht der Engpass"
+          elif [ "$rc" -eq 124 ]; then
+            echo "::error::P1: Prozess-Hang trotz Watchdog (timeout 60 s) — Env-Dump:"
+            env | sort | grep -Ei 'display|dbus|xdg|wayland|gdk' || true
+            exit 1
+          else
+            echo "::error::P1: Probe rc=$rc (Details oben im Log)"
+            exit "$rc"
+          fi
+      - name: "P2-Probe: Hello Window aus dem Quellbaum (pywebview, ohne PyInstaller)"
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          SIA_HELLO_WINDOW_SECONDS: "5"
+          WEBKIT_DISABLE_COMPOSITING_MODE: "1"
+        run: |
+          # Binary-Such: dieselbe App, exakt derselbe Code — nur ohne
+          # PyInstaller-Bundle. Isoliert pywebview-Code vs. Packaging.
+          set +e
+          timeout 60 xvfb-run --auto-servernum python3 packaging/hello_window.py
+          rc=$?
+          set -e
+          if [ "$rc" -eq 0 ]; then
+            echo "P2 OK: pywebview (Quellbaum) zeigt das Fenster — PyInstaller ist der Engpass"
+          else
+            echo "::error::P2: pywebview (Quellbaum) zeigt das Fenster nicht (rc=$rc, Diagnose oben im Log)"
+            exit "$rc"
+          fi
       - name: Build hello window (PyInstaller onefile)
         shell: bash
         run: |
