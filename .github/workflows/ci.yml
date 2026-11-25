@@ -190,10 +190,11 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     env:
-      SIA_DATA_DIR: ${{ runner.temp }}/sia-installer-data
-      SIA_FAKE_KEYCHAIN: ${{ runner.temp }}/sia-installer-keychain
       # CI-Auto-Close: 8 s nach Fenster-Erzeugung Shown-Event abwarten
       # (30 s Toleranz für kalte Init), dann destroy (REQ-813).
+      # (SIA_DATA_DIR/SIA_FAKE_KEYCHAIN mit ${{ runner.temp }} gehören in die
+      # Step-level-Env, weil der runner-Kontext in der Job-level-Env nicht
+      # erlaubt ist.)
       SIA_WINDOW_SECONDS: "8"
       SIA_WINDOW_SHOWN_WAIT: "30"
     steps:
@@ -222,6 +223,8 @@ jobs:
       - name: "Launch-Smoke (Fenster-Auto-Close, Seed beim ersten Start)"
         shell: bash
         env:
+          SIA_DATA_DIR: ${{ runner.temp }}/sia-installer-data
+          SIA_FAKE_KEYCHAIN: ${{ runner.temp }}/sia-installer-keychain
           # Linux: ohne Session-Bus-Discovery entfällt der 25-s-D-Bus-Stall
           # im GApplication-Startup (Root-Cause-Kommentar in
           # packaging-smoke). Auf macOS/Windows werden die Variablen ignoriert.
@@ -256,6 +259,8 @@ jobs:
           esac
       - name: "Seed-Verifikation (9 Pilot-Concepts im User-Datenverzeichnis)"
         shell: bash
+        env:
+          SIA_DATA_DIR: ${{ runner.temp }}/sia-installer-data
         run: |
           .venv/bin/python - <<'PYEOF'
           import os
@@ -276,6 +281,8 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         env:
+          SIA_DATA_DIR: ${{ runner.temp }}/sia-installer-data
+          SIA_FAKE_KEYCHAIN: ${{ runner.temp }}/sia-installer-keychain
           XDG_RUNTIME_DIR: ""
           NO_AT_BRIDGE: "1"
         run: |
