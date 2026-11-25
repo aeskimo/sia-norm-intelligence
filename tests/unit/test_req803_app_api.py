@@ -169,6 +169,13 @@ def test_req803_app_login_failure_protocol_code_1_to_1(
         data = res.json()
         assert data["error"] == "INVALID_PASSWORD: Passwort ist falsch."
         assert data["protocol"] == "Fail_Wrong_PWD"  # G6: 1:1-Protokollcode
+        # G4-sichere Diagnose: nur Nicht-Geheimnis (Kunde/Device im Klartext,
+        # Passwort nur als Länge + Zeichengruppen) — nie das Passwort selbst.
+        diag = data["diagnostic"]
+        assert "Kunde='kunde1' (Länge 6)" in diag
+        assert "Passwort: Länge 6 (klein)" in diag
+        assert "Device='dev-1'" in diag
+        assert "falsch" not in diag  # Passwort-Bytes nie im Payload
         assert shop.is_logged_in is False
 
 

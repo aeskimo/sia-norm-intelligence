@@ -63,6 +63,15 @@ def test_req814_css_has_dark_mode() -> None:
     assert "--text: #F2F2F7" in css
 
 
+def test_req814_js_shows_login_diagnostic() -> None:
+    # Given ein Login-Fehler mit G4-sicherer Diagnose When die UI den
+    # Fehler zeigt Then ist die Diagnose (eingereichte Werte ohne
+    # Passwort-Bytes) neben der Fehlermeldung sichtbar.
+    js = _read("app.js")
+    assert "err.diagnostic = data.diagnostic || null;" in js
+    assert 'msg += " — " + err.diagnostic;' in js
+
+
 def test_req814_js_prefills_device_id_like_java() -> None:
     # Given das Login-Formular (1:1 Java NormenAssistentApp:
     # "SIA-APP-" + UUID.randomUUID()) When die UI geladen Then ist die

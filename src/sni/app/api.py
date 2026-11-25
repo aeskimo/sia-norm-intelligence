@@ -499,9 +499,39 @@ def onboarding_complete(request: Request) -> dict[str, object]:
     return {"done": True}
 
 
+def _login_diagnostic(customer: str, password: str, device_id: str) -> str:
+    """G4-sichere Login-Diagnose für die UI (A/B-Befund: Portal lehnt ab).
+
+    Zeigt exakt, was eingereicht wurde — aber nur Nicht-Geheimnis:
+    Kundennummer und Device-ID im Klartext (beide werden auch im
+    Erfolgs-Payload zurückgeliefert), das Passwort nur als Länge +
+    Zeichengruppen (Gross/klein/Ziffer/Sonder), nie das Passwort selbst.
+    Wird nicht geloggt (G4), nur im 401-Payload zurückgeliefert.
+    """
+    classes = [
+        name
+        for name, check in (
+            ("Gross", any(c.isupper() for c in password)),
+            ("klein", any(c.islower() for c in password)),
+            ("Ziffer", any(c.isdigit() for c in password)),
+            ("Sonder", any(not c.isalnum() for c in password)),
+        )
+        if check
+    ]
+    return (
+        f"Eingereicht: Kunde='{customer.strip()}' (Länge {len(customer.strip())}), "
+        f"Passwort: Länge {len(password)} ({', '.join(classes) or 'leer'}), "
+        f"Device='{device_id.strip()}'"
+    )
+
+
 @router.post("/session/login")
 def session_login(payload: LoginRequest, request: Request) -> JSONResponse:
-    """09 §6.2: ECHO + Login; ``remember`` → Keyring; Fehler-Codes 1:1."""
+    """09 §6.2: ECHO + Login; ``remember`` → Keyring; Fehler-Codes 1:1.
+
+    Bei ``ShopLoginError``: 401 mit ``protocol`` (1:1-Servercode) und
+    G4-sicherer ``diagnostic`` (eingereichte Werte ohne Passwort-Bytes).
+    """
     shop = _shop(request)
     try:
         profile = resolve_provider(payload.provider)
@@ -512,7 +542,12 @@ def session_login(payload: LoginRequest, request: Request) -> JSONResponse:
     try:
         bundle, outcome = shop.login(profile, payload.customer, payload.password, payload.device_id)
     except ShopLoginError as exc:
-        return _error(401, exc.message, protocol=exc.protocol)
+        return _error(
+            401,
+            exc.message,
+            protocol=exc.protocol,
+            diagnostic=_login_diagnostic(payload.customer, payload.password, payload.device_id),
+        )
     keyring: str | None = None
     if payload.remember:
         keyring = _remember(shop, payload.customer, payload.password)

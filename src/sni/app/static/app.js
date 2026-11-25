@@ -29,6 +29,7 @@
     if (!res.ok) {
       const err = new Error(data.error || data.detail || "HTTP " + res.status);
       err.protocol = data.protocol || null;
+      err.diagnostic = data.diagnostic || null;
       throw err;
     }
     return data;
@@ -150,10 +151,14 @@
       state.loggedIn = false;
       state.catalog = [];
       setLoginInputsEnabled(true);
-      setLoginMessage(
-        err.message + (err.protocol ? " [" + err.protocol + "]" : ""),
-        true
-      );
+      let msg = err.message + (err.protocol ? " [" + err.protocol + "]" : "");
+      if (err.diagnostic) {
+        // G4-sichere Diagnose der App (nie das Passwort selbst):
+        // zeigt exakt, was eingereicht wurde (Länge/Zeichengruppen),
+        // damit Tippfehler/Autofill sofort erkennbar sind.
+        msg += " — " + err.diagnostic;
+      }
+      setLoginMessage(msg, true);
     } finally {
       $("login-button").textContent = "Einloggen";
     }
