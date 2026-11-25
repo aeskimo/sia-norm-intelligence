@@ -1,10 +1,13 @@
 """REQ-807: gibb-Modellliste — ``GET /v1/models/gibb`` (09 §6.2).
 
 OpenAI-kompatibler ``/models``-Aufruf mit Bearer aus dem OS-Keyring
-(Java-1:1 ``OpenAiCompatibleProvider.listModels``). Ohne Key oder ohne
-konfiguriertes gibb-Modell sowie bei Erreichbarkeitsfehler:
-``{"available": false, "models": []}``. Loopback-Mock (kein echter gibb,
-09 §12). Synthetische Testdaten (G4).
+(Java-1:1 ``OpenAiCompatibleProvider.listModels``). Wie der Java-«Modelle
+auflisten»-Button: nötig sind nur API-Key + Basis-URL; das Modell-Parameter
+ist der Java-Platzhalter ``"temp"`` (der Listen-Aufruf benutzt es nicht),
+damit die Liste schon vor der Modellauswahl verfügbar ist. Ohne
+Keyring-Key oder bei Erreichbarkeitsfehler: ``{"available": false,
+"models": []}``. Loopback-Mock (kein echter gibb, 09 §12). Synthetische
+Testdaten (G4).
 """
 
 from __future__ import annotations
@@ -69,9 +72,12 @@ def test_req807_gibb_models_without_key(tmp_path: Path, monkeypatch: pytest.Monk
     assert _gibb_models(client) == {"available": False, "models": []}
 
 
-def test_req807_gibb_models_without_configured_model(
+def test_req807_gibb_models_lists_without_configured_model(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # Java 1:1 («Modelle auflisten»-Button): nur API-Key + Basis-URL nötig;
+    # das Modell-Parameter ist der Platzhalter "temp" — die Liste ist auch
+    # vor der Modellauswahl verfügbar (kein Chicken-and-Egg).
     client, _ = _build(tmp_path, monkeypatch)
     GibbApiKeyStore().store("sk-test-123")
     with loopback_server({"/v1/models": lambda _body: (200, MODELS_BODY)}) as server:
@@ -80,7 +86,7 @@ def test_req807_gibb_models_without_configured_model(
             headers=HDRS,
             json={"gibb_base_url": f"{server.url}/v1"},  # gibb_model bleibt leer
         )
-        assert _gibb_models(client) == {"available": False, "models": []}
+        assert _gibb_models(client) == {"available": True, "models": ["gibb-m1", "gibb-m2"]}
 
 
 def test_req807_gibb_models_lists_ids(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

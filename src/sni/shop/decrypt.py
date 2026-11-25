@@ -94,8 +94,14 @@ def unwrap_srd_value(wrapped_b64: str) -> str:
     try:
         return plain.decode("ascii")
     except UnicodeDecodeError as exc:
+        # G4: nur Zählungen (wie «gefunden: N» o. A.) — keine Schlüsselbytes.
+        # Die Ciphertext-Grösse verrät ein formatseitig verändertes Wrapping
+        # (16 Bytes = klassisches 8-Byte-Schlüssel-Material; mehr = langes
+        # Schlüsselmaterial, z. B. AES-Ära).
         raise SiaShopError(
-            "SRD_KEY/SRD_IV: Klartext nicht ASCII — falscher Schlüssel/Format"
+            "SRD_KEY/SRD_IV: Klartext nicht ASCII (Ciphertext: "
+            f"{len(encoded)} Bytes, Klartext: {len(plain)} Bytes) — "
+            "falscher Schlüssel/Format"
         ) from exc
 
 

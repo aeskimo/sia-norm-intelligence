@@ -132,6 +132,21 @@ def test_req801_unwrap_rejects_invalid_base64() -> None:
         unwrap_srd_value("definitely not base64!!!")
 
 
+def test_req801_unwrap_non_ascii_reports_sizes_only() -> None:
+    # Given ein Wrapped-Wert mit nicht-ASCII-Klartext (simuliert ein
+    # formatseitig verändertes Server-Wrapping) When entpackt Then enthält
+    # die Fehlermeldung nur die Zählungen (G4) — keine Schlüssel-Bytes.
+    wrapped = base64.b64encode(
+        des_cbc_encrypt(b"\x80\x81\x82\x83\x84\x85\x86\x87", LEGACY_STATIC_KEY, LEGACY_STATIC_IV)
+    ).decode("ascii")
+    with pytest.raises(SiaShopError) as excinfo:
+        unwrap_srd_value(wrapped)
+    message = str(excinfo.value)
+    assert "Ciphertext: 16 Bytes" in message
+    assert "Klartext: 8 Bytes" in message
+    assert "\x80" not in message
+
+
 def test_req801_mro_rejects_non_zip() -> None:
     with pytest.raises(SiaShopError, match="ZIP"):
         decrypt_mro(b"kein ZIP hier")

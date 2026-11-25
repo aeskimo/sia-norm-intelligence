@@ -1629,6 +1629,14 @@
     }
   }
 
+  /* Geräte-ID (1:1 Java NormenAssistentApp): beim Start mit neuer
+     zufälliger UUID präfillen — die alte App generierte sie, der
+     Nutzer braucht sie nicht zu kennen. */
+  const deviceField = $("login-device");
+  if (deviceField && window.crypto && typeof crypto.randomUUID === "function") {
+    deviceField.value = "SIA-APP-" + crypto.randomUUID();
+  }
+
   window.addEventListener("hashchange", render);
   checkFirstRun();
   poll();

@@ -63,6 +63,15 @@ def test_req814_css_has_dark_mode() -> None:
     assert "--text: #F2F2F7" in css
 
 
+def test_req814_js_prefills_device_id_like_java() -> None:
+    # Given das Login-Formular (1:1 Java NormenAssistentApp:
+    # "SIA-APP-" + UUID.randomUUID()) When die UI geladen Then ist die
+    # Geräte-ID präbefüllt (die alte App generierte sie pro Start).
+    js = _read("app.js")
+    assert 'deviceField = $("login-device")' in js
+    assert '"SIA-APP-" + crypto.randomUUID()' in js
+
+
 def test_req814_js_handles_session_token_in_memory() -> None:
     # Given die UI-Logik When gestartet Then Token kommt aus der URL und
     # wird an API-Requests übergeben (REQ-816)

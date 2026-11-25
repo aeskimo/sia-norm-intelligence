@@ -734,17 +734,21 @@ def models_ollama_delete(name: str) -> JSONResponse:
 def models_gibb(request: Request) -> dict[str, object]:
     """09 §6.2: gibb-Modellliste (OpenAI ``/models``, Bearer aus Keyring, REQ-807).
 
-    Ohne Keyring-Key, ohne konfiguriertes gibb-Modell oder bei Erreich-
-    barkeitsfehler: ``{"available": false, "models": []}``.
+    1:1 wie der Java-«Modelle auflisten»-Button: nötig sind nur der
+    API-Key (Keyring) und die Basis-URL aus den Einstellungen; das
+    Modell-Parameter ist der Java-Platzhalter ``"temp"``, weil der
+    Listen-Aufruf es nicht benutzt — die Liste ist damit schon vor der
+    Modellauswahl verfügbar. Ohne Keyring-Key oder bei
+    Erreichbarkeitsfehler: ``{"available": false, "models": []}``.
     """
     shop = _shop(request)
     settings = load_settings(shop.data_dir)
     api_key = GibbApiKeyStore().load()
-    model = str(settings["gibb_model"]).strip()
-    if api_key is None or not model:
+    if api_key is None:
         return {"available": False, "models": []}
     try:
-        provider = OpenAiCompatibleProvider(str(settings["gibb_base_url"]), api_key, model)
+        # Java: new OpenAiCompatibleProvider(base, key, "temp")
+        provider = OpenAiCompatibleProvider(str(settings["gibb_base_url"]), api_key, "temp")
         return {"available": True, "models": provider.list_models()}
     except Exception:  # noqa: BLE001 — gibb abwesend/falsch konfiguriert
         return {"available": False, "models": []}
