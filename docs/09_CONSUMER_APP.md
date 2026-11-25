@@ -1,6 +1,6 @@
 # 09 – Consumer-App (M8): Web-UI auf dem SNI-Kern
 
-**Stand:** 24.11.2026 · **Status:** beschlossen (User-Entscheide OQ-009…012, ADR-0007/0008/0009 akzeptiert 24.11.2026)
+**Stand:** 25.11.2026 · **Status:** beschlossen (User-Entscheide OQ-009…012, ADR-0007/0008/0009 akzeptiert 24.11.2026; OQ-015 entschieden 25.11.2026 — M8.3 mit `sia101-2020` + Fixtures)
 
 M8 macht aus dem SNI-Sidecar die vollständige, cross-platform Consumer-App
 "SIA-Normenassistent": ein lokales Python/FastAPI-Kern-Programm mit Web-UI,
@@ -494,7 +494,7 @@ im Java-Projekt (Screenshot + nicht-blank).
 | Risiko | Mitigation |
 |---|---|
 | PDF-Extraktion < Java-Baseline (Semantik-Export bröckelt) | Fixture-Gate in M8.3 mit pypdfium2 **und** pdfminer.six; Fallback: Verlierer-Engine tauschen → Poppler-Option → Re-Decision (OQ-010) |
-| 8 von 9 Pilot-PDFs ohne Textschicht (reine Vektorgrafik, 0 extrahierbare Zeichen; nur `sia101-2020` liefert Text) | M9-Pilot-Befund 2026-11-23 (OQ-015, ADR-0010): REQ-804 (M8.3) ist für diese 8 Normen blockiert — weder pypdfium2 noch pdfminer.six kompensieren eine fehlende Textschicht; OCR ist v1-ausserhalb (ADR-0010). Offene User-Entscheidung OQ-015 (SIA-Neuexport mit Textschicht vs. OCR-Strategie). M8.2 und M8.4–M8.5 sind davon nicht betroffen |
+| 8 von 9 Pilot-PDFs ohne Textschicht (reine Vektorgrafik, 0 extrahierbare Zeichen; nur `sia101-2020` liefert Text) | M9-Pilot-Befund 2026-11-23 (OQ-015, ADR-0010): REQ-804 (M8.3) ist für diese 8 Normen blockiert — weder pypdfium2 noch pdfminer.six kompensieren eine fehlende Textschicht; OCR ist v1-ausserhalb (ADR-0010). **Entschieden 2026-11-25 (User, OQ-015):** M8.3 fährt mit `sia101-2020` (die 1 Norm mit Textschicht) + synthetischen Fixtures; die 8 textlosen Normen bleiben als blockiert/`ERROR` in der Dokument-Registry (sichtbarer Status in der UI). SIA-Neuexport mit Textschicht bleibt offenes externes Thema (User-Anfrage), ohne dass M8.3 darauf wartet. M8.2 und M8.4–M8.5 sind davon nicht betroffen |
 | SIA-Protokoll-Drift (SOAP, DES, Timeouts) | Protokoll-Tests mit Mock (Java-Verhalten referenziert); Retry-Logik 1:1 (1× nach 500 ms); DES per Known-Answer-Test gegen Java-Werte gesichert (REQ-801) |
 | `cryptography` entfernt (3-)DES (auf 50.x verifiziert: Single-DES-Klasse weg) | **Gelöst (REQ-801):** `TripleDES(k+k+k)` mit 24-Byte-Key ≡ Single DES, kein Deprecation-Pfad; `cryptography>=46,<51` gepinnt; KAT gegen Java-Referenzwerte grün (2026-11-24) |
 | Keyring ohne Secret-Service (Linux) | File-Fallback + sichtbare Warnung; Doku |
@@ -511,6 +511,8 @@ im Java-Projekt (Screenshot + nicht-blank).
   ADR-0009 (Datenlayout/Credentials) — alle akzeptiert 24.11.2026
   per User-Entscheid
 - OQ-009…OQ-013 (beantwortet, User-Entscheide 24.11.2026) ·
-  OQ-014 (Code-Signing/Notarization)
+  OQ-014 (Code-Signing/Notarization) ·
+  OQ-015 (beantwortet, User-Entscheid 25.11.2026: M8.3 mit
+  `sia101-2020` + Fixtures, 8 textlose Normen als blockiert/ERROR)
 - 03_ARCHITECTURE.md (Schichten) · 04_DATA_MODEL.md (Lebenszyklen) ·
   07_GUARDRAILS.md (G1–G7) · AGENTS.md (§5 Abhängigkeiten, §6 DoD)
