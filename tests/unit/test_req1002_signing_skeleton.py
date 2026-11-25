@@ -48,6 +48,29 @@ def test_req1002_signing_scripts_exist_and_compile() -> None:
         subprocess.run([bash, "-n", str(script)], check=True)
 
 
+def test_req1002_signing_scripts_fail_fast_without_env() -> None:
+    # Ohne Signing-Env-Variablen brechen die Skripte mit sauberem
+    # Fehler ab (vor jeder OS-spezifischen Aktion) — Cross-Platform,
+    # weil der Env-Check vor security/codesign/signtool steht.
+    bash = _bash()
+    if bash is None:
+        pytest.skip("Git-Bash nicht verfügbar (Windows ohne Git-Installation)")
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if not k.startswith(("MACOS_SIGNING", "WINDOWS_SIGNING", "APPLE_"))
+    }
+    for script in SCRIPTS:
+        proc = subprocess.run(
+            [bash, str(script), "dummy-target"],
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        assert proc.returncode != 0, f"{script} ohne Env-Variablen nicht abgebrochen"
+        assert "fehlt" in proc.stdout + proc.stderr
+
+
 def test_req1002_ci_has_conditional_signing_steps() -> None:
     text = CI.read_text(encoding="utf-8")
     assert "MACOS_SIGNING_ENABLED" in text

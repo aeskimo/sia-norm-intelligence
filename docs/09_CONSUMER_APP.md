@@ -478,6 +478,21 @@ Ohne Flags bleibt der M8.6-Zustand (unsigned + o. Hinweise)
 bestehen; die Pipeline wird nie an fehlenden Credentials gehängt
 (REQ-1002).
 
+**Credential-Erstellung (M10):**
+- **macOS:** Schlüsselverwaltung → «Developer ID Application: NAME»
+  (mit privatem Schlüssel) → als `.p12` exportieren (Passwort setzen)
+  → `base64 -i cert.p12` → `MACOS_SIGNING_CERT`. Identity-String und
+  Team-ID: `security find-identity -v -p codesigning` (bzw.
+  developer.apple.com → Members → Team ID). App-spezifisches
+  Passwort: appleid.apple.com → «Anmeldung und Sicherheit» →
+  «App-spezifische Passwörter».
+- **Windows:** Zertifikat mit privatem Schlüssel als `.pfx`
+  exportieren (Zertifikatsmanager / `certutil -exportpfx`) →
+  base64-codieren → `WINDOWS_SIGNING_CERT`. Hinweis: EV-Zertifikate
+  liegen oft auf Hardware-Token — dann muss im
+  `packaging/sign/windows_sign.sh` der zugehörige signtool-Provider
+  ergänzt werden (Teil des M10-Akzeptanzlaufs).
+
 ## 12. Teststrategie
 
 - **Unit/Integration (pytest, existierendes Muster):** je Modul;
