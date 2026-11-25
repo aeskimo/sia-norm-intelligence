@@ -40,6 +40,9 @@ from sni.rag.grounded import GroundedQa
 from sni.rag.model_provider import ModelProvider
 from sni.rag.providers.gibb import OpenAiCompatibleProvider
 from sni.rag.providers.ollama import OllamaChatProvider
+from sni.review.service import ReviewError, list_queue
+from sni.review.service import approve as review_approve
+from sni.review.service import reject as review_reject
 from sni.search.page_source import PageSource
 from sni.secrets.keyring_store import GibbApiKeyStore, KeyringUnavailableError
 from sni.shop.catalog_xml import StandardDocument
@@ -105,6 +108,16 @@ class WorksetUpdateRequest(BaseModel):
     """Arbeitsset: Dokument-Liste ersetzen (09 §6.2)."""
 
     document_ids: list[str]
+
+
+class ReviewApproveRequest(BaseModel):
+    """Kandidat freigeben (09 §6.2, ADR-0008).
+
+    ``approved_by``: Override aus dem Freigabe-Dialog; fehlt es, wird die
+    konfigurierte Freigabeperson (Settings ``approval_name``) verwendet.
+    """
+
+    approved_by: str | None = None
 
 
 class CatalogItem(BaseModel):
@@ -793,3 +806,52 @@ def worksets_delete(name: str, request: Request) -> JSONResponse:
         shop.worksets.delete(name)
         shop.save_worksets()
     return JSONResponse({"ok": True, "disclaimer": DISCLAIMER})
+
+
+# ------------------------------------------------------------------ Review-Queue (REQ-809)
+
+
+@router.get("/review/queue")
+def review_queue_list(request: Request) -> JSONResponse:
+    """09 §6.2: Review-Queue — Kandidaten (``review_status=candidate``) + offene Gaps."""
+    candidates, gaps = list_queue()
+    return JSONResponse({"candidates": candidates, "gaps": gaps, "disclaimer": DISCLAIMER})
+
+
+@router.post("/review/{obj_id:path}/approve")
+def review_approve_endpoint(
+    obj_id: str, payload: ReviewApproveRequest, request: Request
+) -> JSONResponse:
+    """09 §6.2: Kandidat freigeben (G3: menschlicher Akt, ADR-0008).
+
+    ``approved_by``: explizit im Request (Override im Dialog) oder die
+    konfigurierte Freigabeperson (Settings ``approval_name``); fehlt
+    beides → 400 (die UI fragt dann einmalig nach und speichert sie).
+    """
+    shop = _shop(request)
+    approver = (payload.approved_by or "").strip()
+    if not approver:
+        approver = str(load_settings(shop.data_dir).get("approval_name") or "").strip()
+    try:
+        result = review_approve(obj_id, approver)
+    except ReviewError as exc:
+        return _error(400, str(exc))
+    return JSONResponse(
+        {
+            "id": obj_id,
+            "status": "approved",
+            "approved_by": str(result.get("approved_by") or ""),
+            "approved_at": str(result.get("approved_at") or ""),
+            "disclaimer": DISCLAIMER,
+        }
+    )
+
+
+@router.post("/review/{obj_id:path}/reject")
+def review_reject_endpoint(obj_id: str, request: Request) -> JSONResponse:
+    """09 §6.2: Queue-Objekt verwerfen (G3; Java 1:1: Kandidaten und Gaps)."""
+    try:
+        review_reject(obj_id)
+    except ReviewError as exc:
+        return _error(400, str(exc))
+    return JSONResponse({"id": obj_id, "status": "rejected", "disclaimer": DISCLAIMER})
