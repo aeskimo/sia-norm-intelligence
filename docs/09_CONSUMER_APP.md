@@ -212,6 +212,7 @@ Sicherheit: §10.2 (zufälliger Port, Session-Token, Host/Origin-Check).
 | `GET` | `/v1/models/ollama` | `GET /api/tags` weiterreichen |
 | `POST` | `/v1/models/ollama/{name}/pull` | async Job (2-h-Timeout wie Java) |
 | `DELETE` | `/v1/models/ollama/{name}` | Modell löschen |
+| `GET` | `/v1/models/gibb` | gibb-Modellliste (OpenAI `models`, Bearer aus Keyring) → `{available, models[]}` |
 | `GET/PUT` | `/v1/settings` | `sni:settings` (Modelle, Provider, gibb-URL/Modell, Freigabename); gibb-Key nie als Antwort (nur `gibb_key_set: true`) |
 | `POST` | `/v1/ingest/semantic-export` | `{norm_id}` → deterministischer Export → `document.json` → Ingest in-process → `{candidates[], skipped[], gaps[]}` |
 | `GET` | `/v1/review/queue` | Kandidaten (`norm_statement`, `review_status=candidate`) + GAPs |

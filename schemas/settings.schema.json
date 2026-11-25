@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sni:settings",
+  "description": "App-Einstellungen (M8.4, 09_CONSUMER_APP.md §6.2): Modelle, Provider, gibb-URL/-Modell, Freigabename (G3-Vorbereitung); der gibb-API-Key ist nie Teil der Antwort (G4).",
+  "type": "object",
+  "required": [
+    "generation_model",
+    "embedding_model",
+    "provider",
+    "gibb_base_url",
+    "gibb_model",
+    "approval_name",
+    "gibb_key_set",
+    "data_dir",
+    "state_key_set",
+    "disclaimer"
+  ],
+  "properties": {
+    "generation_model": {"type": "string", "description": "Antwort-Modell (Default: qwen3:4b)"},
+    "embedding_model": {"type": "string", "description": "Embedding-Modell (Default: embeddinggemma)"},
+    "provider": {"enum": ["ollama", "gibb"], "description": "Antwort-Provider (Default: ollama)"},
+    "gibb_base_url": {
+      "type": "string",
+      "description": "OpenAI-kompatible gibb-URL (HTTPS-only, http nur Loopback)"
+    },
+    "gibb_model": {"type": "string", "description": "gibb-Modell-Id (leer = nicht konfiguriert)"},
+    "approval_name": {
+      "type": "string",
+      "description": "Freigabename für G3-Review (REQ-809-Vorbereitung)"
+    },
+    "gibb_key_set": {
+      "type": "boolean",
+      "description": "gibb-API-Key im OS-Keyring vorhanden (Key selbst wird nie übermittelt)"
+    },
+    "data_dir": {"type": "string", "description": "User-Datenverzeichnis (read-only)"},
+    "state_key_set": {
+      "type": "boolean",
+      "description": "Statusschlüssel verfügbar (Umgebungsvariable oder Keyring)"
+    },
+    "disclaimer": {"type": "string", "description": "G6-Disclaimer"}
+  }
+}

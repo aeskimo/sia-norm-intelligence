@@ -41,8 +41,11 @@ from sni.rag.model_provider import ModelProvider
 from sni.rag.providers.gibb import OpenAiCompatibleProvider
 from sni.rag.providers.ollama import OllamaChatProvider
 from sni.search.page_source import PageSource
-from sni.secrets.keyring_store import GibbApiKeyStore
+from sni.secrets.keyring_store import GibbApiKeyStore, KeyringUnavailableError
 from sni.shop.catalog_xml import StandardDocument
+from sni.state.paths import user_data_dir
+from sni.state.settings import load_settings, update_settings
+from sni.state.worksets import valid_document_id, valid_name
 from sni.state.workspace import (
     DEFAULT_GENERATION_MODEL,
     DEFAULT_GIBB_BASE_URL,
@@ -74,6 +77,34 @@ class LoginRequest(BaseModel):
     password: str
     device_id: str
     remember: bool = False
+
+
+class SettingsRequest(BaseModel):
+    """Einstellungen-Update (09 §6.2); alle Felder optional (Teilmenge).
+
+    ``gibb_key`` (nicht-leer) wird in den OS-Keyring gespeichert und nie
+    zurückgeliefert; leer = unverändert (v1 ohne Lösch-Weg, G4).
+    """
+
+    generation_model: str | None = None
+    embedding_model: str | None = None
+    provider: str | None = None
+    gibb_base_url: str | None = None
+    gibb_model: str | None = None
+    approval_name: str | None = None
+    gibb_key: str | None = None
+
+
+class WorksetCreateRequest(BaseModel):
+    """Arbeitsset anlegen (09 §6.2; idempotent wie Java ``computeIfAbsent``)."""
+
+    name: str
+
+
+class WorksetUpdateRequest(BaseModel):
+    """Arbeitsset: Dokument-Liste ersetzen (09 §6.2)."""
+
+    document_ids: list[str]
 
 
 class CatalogItem(BaseModel):
@@ -559,7 +590,7 @@ def ask(payload: AskRequest, request: Request) -> StreamingResponse | JSONRespon
 
 @router.delete("/documents/{document_id}")
 def document_remove(document_id: str, request: Request) -> JSONResponse:
-    """09 §6.2: Cache + Index entfernen (Zeroing)."""
+    """09 §6.2: Cache + Index entfernen (Zeroing); Arbeitssets aktualisieren."""
     bundle = _require_bundle(request)
     if isinstance(bundle, JSONResponse):
         return bundle
@@ -568,6 +599,11 @@ def document_remove(document_id: str, request: Request) -> JSONResponse:
     with contextlib.suppress(ValueError):
         bundle.cache.delete(document_id)
     bundle.registry.remove(document_id)
+    # REQ-808 (Java: WorksetStore.removeDocumentEverywhere): die Id verliert
+    # ihre Referenz in allen Arbeitssets.
+    shop = _shop(request)
+    shop.worksets.remove_document_everywhere(document_id)
+    shop.save_worksets()
     return JSONResponse(
         {"status": "ok", "message": "Dokument entfernt (Cache + Index).", "disclaimer": DISCLAIMER}
     )
@@ -625,4 +661,135 @@ def models_ollama_delete(name: str) -> JSONResponse:
         return _error(400, str(exc))
     except Exception as exc:  # noqa: BLE001 — Ollama-Fehler → 502
         return _error(502, f"Modell konnte nicht gelöscht werden: {exc}")
+    return JSONResponse({"ok": True, "disclaimer": DISCLAIMER})
+
+
+@router.get("/models/gibb")
+def models_gibb(request: Request) -> dict[str, object]:
+    """09 §6.2: gibb-Modellliste (OpenAI ``/models``, Bearer aus Keyring, REQ-807).
+
+    Ohne Keyring-Key, ohne konfiguriertes gibb-Modell oder bei Erreich-
+    barkeitsfehler: ``{"available": false, "models": []}``.
+    """
+    shop = _shop(request)
+    settings = load_settings(shop.data_dir)
+    api_key = GibbApiKeyStore().load()
+    model = str(settings["gibb_model"]).strip()
+    if api_key is None or not model:
+        return {"available": False, "models": []}
+    try:
+        provider = OpenAiCompatibleProvider(str(settings["gibb_base_url"]), api_key, model)
+        return {"available": True, "models": provider.list_models()}
+    except Exception:  # noqa: BLE001 — gibb abwesend/falsch konfiguriert
+        return {"available": False, "models": []}
+
+
+# ------------------------------------------------------------------ Einstellungen (REQ-808)
+
+
+def _settings_payload(shop: ShopState, data: dict[str, object]) -> dict[str, object]:
+    """GET/PUT-Antwort (``sni:settings``): Status-Felder + G6-Disclaimer.
+
+    Der gibb-Key selbst kommt nie in die Antwort (G4).
+    """
+    data["gibb_key_set"] = GibbApiKeyStore().load() is not None
+    data["state_key_set"] = shop.state_keys.available()
+    data["data_dir"] = str(shop.data_dir if shop.data_dir is not None else user_data_dir())
+    data["disclaimer"] = DISCLAIMER
+    return data
+
+
+@router.get("/settings")
+def settings_get(request: Request) -> dict[str, object]:
+    """09 §6.2: Einstellungen (``sni:settings``); gibb-Key nie als Antwort."""
+    shop = _shop(request)
+    return _settings_payload(shop, load_settings(shop.data_dir))
+
+
+@router.put("/settings")
+def settings_put(payload: SettingsRequest, request: Request) -> JSONResponse:
+    """09 §6.2: Einstellungen aktualisieren (Teilmenge); gibb-Key → Keyring.
+
+    Reihenfolge: Keyring-Vorgang erst, dann Persistenz — bei Keyring-
+    Fehler (500) bleibt ``workspace.json`` unverändert.
+    """
+    shop = _shop(request)
+    updates = {
+        key: value
+        for key, value in payload.model_dump().items()
+        if value is not None and key != "gibb_key"
+    }
+    try:
+        if payload.gibb_key is not None and payload.gibb_key.strip():
+            GibbApiKeyStore().store(payload.gibb_key)
+        data = update_settings(shop.data_dir, updates)
+    except ValueError as exc:
+        return _error(400, str(exc))
+    except KeyringUnavailableError as exc:
+        return _error(500, str(exc))
+    return JSONResponse(_settings_payload(shop, data))
+
+
+# ------------------------------------------------------------------ Arbeitssets (REQ-808)
+
+
+@router.get("/worksets")
+def worksets_list(request: Request) -> list[dict[str, object]]:
+    """09 §6.2: Arbeitssets → ``[sni:workset]`` (Einfüge-Reihenfolge)."""
+    store = _shop(request).worksets
+    return [{"name": name, "document_ids": list(store.documents(name))} for name in store.names()]
+
+
+@router.post("/worksets")
+def worksets_create(payload: WorksetCreateRequest, request: Request) -> JSONResponse:
+    """09 §6.2: Arbeitsset anlegen (idempotent wie Java ``computeIfAbsent``)."""
+    shop = _shop(request)
+    try:
+        name = valid_name(payload.name)
+        shop.worksets.create(name)
+    except ValueError as exc:
+        return _error(400, str(exc))
+    shop.save_worksets()
+    return JSONResponse(
+        {
+            "name": name,
+            "document_ids": list(shop.worksets.documents(name)),
+            "disclaimer": DISCLAIMER,
+        }
+    )
+
+
+@router.put("/worksets/{name}")
+def worksets_update(name: str, payload: WorksetUpdateRequest, request: Request) -> JSONResponse:
+    """09 §6.2: Dokument-Liste ersetzen (ungültige Id → 400, Liste unverändert)."""
+    shop = _shop(request)
+    store = shop.worksets
+    try:
+        workset_name = valid_name(name)
+        store.create(workset_name)
+        for document_id in payload.document_ids:
+            valid_document_id(document_id)
+    except ValueError as exc:
+        return _error(400, str(exc))
+    for document_id in list(store.documents(workset_name)):
+        store.remove(workset_name, document_id)
+    for document_id in payload.document_ids:
+        store.add(workset_name, document_id)
+    shop.save_worksets()
+    return JSONResponse(
+        {
+            "name": workset_name,
+            "document_ids": list(store.documents(workset_name)),
+            "disclaimer": DISCLAIMER,
+        }
+    )
+
+
+@router.delete("/worksets/{name}")
+def worksets_delete(name: str, request: Request) -> JSONResponse:
+    """09 §6.2: Arbeitsset löschen (idempotent wie Java ``remove``)."""
+    shop = _shop(request)
+    if name in shop.worksets.names():
+        shop.worksets.delete(name)
+        shop.save_worksets()
     return JSONResponse({"ok": True, "disclaimer": DISCLAIMER})

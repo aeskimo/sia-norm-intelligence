@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sni:workset",
+  "description": "Arbeitsset der Consumer-App (M8.4, 09_CONSUMER_APP.md §6.2): benannte Gruppe lokaler Dokument-IDs, persistiert in workspace.json (REQ-808, 1:1 Java WorksetStore).",
+  "type": "object",
+  "required": ["name", "document_ids"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "Gestrippter Name (1:1 Java WorksetStore)"
+    },
+    "document_ids": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^[A-Za-z0-9._-]{1,160}$"},
+      "description": "Lokale Dokument-IDs in Einfüge-Reihenfolge (LinkedHashSet-Semantik)"
+    }
+  }
+}

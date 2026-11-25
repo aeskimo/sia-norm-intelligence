@@ -33,6 +33,7 @@ from sni.shop.soap import SiaSoapClient
 from sni.state.index_cache import EncryptedIndexCache
 from sni.state.keys import ChainedStateKeyProvider, default_state_keys
 from sni.state.paths import index_dir
+from sni.state.worksets import WorksetStore, load_store, save_store
 
 #: App-Provider (09 §6.2: ``{provider, ...}`` — kurze, klein geschriebene Keys).
 PROVIDERS: dict[str, ProviderProfile] = {
@@ -97,6 +98,9 @@ class ShopState:
         self._pull_jobs: dict[str, Job] = {}
         self._pull_lock = threading.RLock()
         self._pull_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="sni-model-pull")
+        # REQ-808: Arbeitssets (Login-unabhängig, persistiert in
+        # workspace.json; Java: PersistedWorkspace/WorksetStore).
+        self._worksets = load_store(data_dir)
 
     # ------------------------------------------------------------------ Zugriff
 
@@ -118,6 +122,20 @@ class ShopState:
     def data_dir(self) -> Path | None:
         """User-Datenverzeichnis (``SIA_DATA_DIR``/Injektion); ``None`` = Default."""
         return self._data_dir
+
+    @property
+    def worksets(self) -> WorksetStore:
+        """Arbeitssets (REQ-808, Login-unabhängig, persistiert in workspace.json)."""
+        return self._worksets
+
+    @property
+    def state_keys(self) -> ChainedStateKeyProvider:
+        """Statusschlüssel-Quellen (Env → Keyring); für ``GET /v1/settings``."""
+        return self._state_keys
+
+    def save_worksets(self) -> None:
+        """Persistiert die Arbeitssets in ``workspace.json`` (atomar)."""
+        save_store(self._worksets, self._data_dir)
 
     # ------------------------------------------------------------------ Modell-Pull (REQ-806)
 

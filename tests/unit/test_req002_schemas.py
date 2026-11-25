@@ -20,8 +20,10 @@ EXPECTED = {
     "project_values.schema.json",
     "rag_answer.schema.json",  # M8.3 (09 §6.2)
     "rule.schema.json",
+    "settings.schema.json",  # M8.4 (09 §6.2)
     "source_reference.schema.json",
     "status.schema.json",
+    "workset.schema.json",  # M8.4 (09 §6.2)
 }
 
 
