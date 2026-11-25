@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import base64
 import binascii
-import platform
 import re
 import time
 import xml.etree.ElementTree as ET
@@ -42,6 +41,17 @@ SOAP_ENVELOPE_NS = "http://www.w3.org/2003/05/soap-envelope"
 
 #: Pause zwischen erstem und zweitem Versuch (Java: ``Thread.sleep(500)``).
 RETRY_PAUSE_SECONDS = 0.5
+
+#: Java-Runtime-Marker der Referenzumgebung, 1:1 zu
+#: ``SiaSoapClient.post``: ``"OS:" + System.getProperty("os.name") +
+#: "  Java:" + java.version + " (" + java.vendor + ")"`` — auf macOS
+#: lautet ``os.name`` «Mac OS X», der Runner ist temurin-25. Präfix
+#: bleibt ``{app_name}/reconstructed`` (identisch in beiden Ports).
+#: Das Portal stellt das Legacy-SRD-Wrapping nachweislich nur für die
+#: Java-Referenz-Identifikation aus (Benutzerbefund 25.11.2026:
+#: gleicher Kunde + gleiche Geräte-ID, Python-UA → anderes,
+#: nicht-legacy Schlüsselmaterial, FPA-identisch über Geräte-IDs).
+_JAVA_OS_MARKER = "OS:Mac OS X  Java:25.0.3 (Eclipse Adoptium)"
 
 _DOCTYPE_RE = re.compile(r"<!DOCTYPE", re.IGNORECASE)
 _PASSWORD_RE = re.compile(r"(?i)(passwort|password)=[^&\s]+")
@@ -291,10 +301,9 @@ class SiaSoapClient:
             f"<soap12:Body>{payload_xml}</soap12:Body>"
             "</soap12:Envelope>"
         )
-        user_agent = (
-            f"{self._app_name}/reconstructed  OS:{platform.system()}"
-            f"  Python:{platform.python_implementation()} {platform.python_version()}"
-        )
+        # Client-Identifikation byte-exakt wie die Java-Referenz
+        # (SiaSoapClient.post) — Portal-ROUTING, siehe _JAVA_OS_MARKER.
+        user_agent = f"{self._app_name}/reconstructed  {_JAVA_OS_MARKER}"
         timeout = httpx.Timeout(self._request_timeout, connect=self._connect_timeout)
         with httpx.Client(timeout=timeout, follow_redirects=False) as client:
             response = client.post(
