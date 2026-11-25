@@ -109,6 +109,26 @@ jobs:
             echo "::error::P1: Probe rc=$rc (Details oben im Log)"
             exit "$rc"
           fi
+      - name: "P1b-Probe: Gtk.Application mit G_MESSAGES_DEBUG=all (D-Bus-Verkehr)"
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          # GLib/GDBus-Debug: zeigt jede D-Bus-Message (gesendet/empfangen).
+          # Ziel: identifizieren, welcher Call ~25 s (D-Bus-Default-Timeout)
+          # vor "ACTIVATE FIRED" ohne Antwort wartet (Run 45516051085:
+          # P0=0.0 s, P1-activate=25.0 s — Block liegt im GApplication-Pfad).
+          G_MESSAGES_DEBUG: "all"
+        run: |
+          # Gleiche Probe wie P1, nur mit Debug-Log. rc wie P1 (0 = fired).
+          set +e
+          timeout 90 xvfb-run --auto-servernum python3 packaging/ci_gtk_probe.py
+          rc=$?
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::P1b: Probe rc=$rc (Details oben im Log)"
+            exit "$rc"
+          fi
+          echo "P1b OK: Debug-Log im Job-Log (D-Bus-Verkehr um die 25-s-Lücke)"
       - name: "P2-Probe: Hello Window aus dem Quellbaum (pywebview, ohne PyInstaller)"
         if: runner.os == 'Linux'
         shell: bash
