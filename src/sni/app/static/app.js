@@ -59,6 +59,9 @@
     if (view !== "settings") {
       settingsLoaded = false; // beim erneuten Betreten neu laden
     }
+    if (window.SiaHelp) {
+      SiaHelp.init(view); // Bereichshilfe synchron mit dem View-Wechsel (idempotent)
+    }
     for (const name of VIEWS) {
       const section = $("view-" + name);
       if (section) {

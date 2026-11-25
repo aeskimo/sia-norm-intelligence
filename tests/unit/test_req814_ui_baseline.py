@@ -91,9 +91,30 @@ def test_req814_js_handles_session_token_in_memory() -> None:
     assert "history.replaceState" in js
 
 
+def test_req814_help_covers_all_work_views() -> None:
+    # Given die Bereichshilfe When geprüft Then jeder Arbeitsbereich (ohne
+    # die Onboarding-View, die selbst die Hilfe ist) hat einen Eintrag mit
+    # Kurz-Hinweis (tip) und Volltext (sections).
+    js = _read("help.js")
+    for view in VIEWS:
+        assert f"{view}: {{" in js, f"Hilfe-Eintrag für '{view}' fehlt"
+    assert js.count("tip:") == len(VIEWS)
+    assert js.count("sections:") == len(VIEWS)
+
+
+def test_req814_help_panel_hooked_into_router() -> None:
+    # Given die Bereichshilfe verdrahtet When die UI geladen Then lädt
+    # index.html help.js und der Hash-Router ruft pro View
+    # SiaHelp.init(view) auf (Erstbesuchs-Hinweis + Hilfe-Button).
+    html = _read("index.html")
+    js = _read("app.js")
+    assert '<script src="/static/help.js"></script>' in html
+    assert "SiaHelp.init(view)" in js
+
+
 def test_req814_ui_is_fully_offline() -> None:
     # Given die UI (G4/CSP) When geprüft Then keine externen Resources
-    for name in ("index.html", "sia.css", "app.js"):
+    for name in ("index.html", "sia.css", "app.js", "help.js"):
         content = _read(name)
         for line in content.splitlines():
             assert "http://" not in line and "https://" not in line, (

@@ -542,3 +542,31 @@ select:focus-visible {
   gap: 14px;
   margin-top: 14px;
 }
+
+/* --- Bereichshilfe (Hilfe in jedem Bereich) ------------------------------ */
+.view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.help-card {
+  margin-bottom: 16px;
+}
+.help-tip {
+  background: var(--window);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.help-tip p {
+  margin: 0 0 8px;
+}
+.help-heading {
+  margin: 12px 0 2px;
+  font-size: 13px;
+}
+.help-actions {
+  margin-top: 12px;
+}

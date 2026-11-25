@@ -142,6 +142,16 @@ Dev-Extras: `playwright` (UI-Tests), `pyinstaller` (Build).
 Navigation: schmale Sidebar (Icon + Label), wie bei modernen Consumer-Apps;
 Statuszeile pro Seite (semantischer Farbpunkt, wie `SiaDesign.Status`).
 
+**Bereichshilfe / Onboarding pro View:** Jeder der 6 Arbeitsbereiche
+(ohne die Onboarding-View, die selbst die Hilfe ist) trägt einen
+«Hilfe»-Button im View-Header, der ein statisches Hilfe-Panel für den
+Bereich öffnet (Zweck, typischer Ablauf, häufige Meldungen/Grenzen).
+Beim ersten Besuch einer View öffnet sich das Panel automatisch mit
+einem Kurz-Hinweis; «Verstanden» merkt sich die Bestätigung pro Bereich
+(localStorage), danach bleibt der Button der Zugriff. Der Inhalt ist
+statisch und versioniert (`static/help.js`) — kein Backend, offline-
+konform (REQ-814: keine externen Resources in den UI-Dateien).
+
 ### 5.2 Design-System (SIA-Design → CSS)
 
 Die existierende Java-Design-Schicht wird 1:1 als **CSS Custom Properties**
