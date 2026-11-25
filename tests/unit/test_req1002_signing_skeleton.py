@@ -9,8 +9,11 @@ enthält die bedingten Signing-Steps zwischen Build und Smoke.
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CI = REPO_ROOT / ".github" / "workflows" / "ci.yml"
@@ -20,10 +23,29 @@ SCRIPTS = (
 )
 
 
+def _bash() -> str | None:
+    """Bash-Pfad für die Syntaxprüfung; ``None`` → Check wird übersprungen.
+
+    Windows: explizit Git-Bash nehmen. Der PATH-``bash`` ist auf GHA-
+    Windows-Runnern teils der WSL-Stub (``C:\\Windows\\System32``),
+    der ohne installierte Distribution nicht funktioniert — der CI-
+    Step selbst nutzt Git-Bash (``C:\\Program Files\\Git\\bin\\bash.EXE``,
+    s. Step-Logs), und der ist auf den Runnern standardmässig da.
+    """
+    if os.name != "nt":
+        return "bash"
+    git_bash = Path(r"C:\Program Files\Git\bin\bash.EXE")
+    return str(git_bash) if git_bash.exists() else None
+
+
 def test_req1002_signing_scripts_exist_and_compile() -> None:
     for script in SCRIPTS:
         assert script.is_file(), f"{script} fehlt"
-        subprocess.run(["bash", "-n", str(script)], check=True)
+    bash = _bash()
+    if bash is None:
+        pytest.skip("Git-Bash nicht verfügbar (Windows ohne Git-Installation)")
+    for script in SCRIPTS:
+        subprocess.run([bash, "-n", str(script)], check=True)
 
 
 def test_req1002_ci_has_conditional_signing_steps() -> None:
