@@ -693,7 +693,23 @@
     if (!docs.length) {
       $("assistant-docs-hint").hidden = false;
       $("assistant-docs").innerHTML = "";
+      $("assistant-need-analyze-hint").hidden = true;
       return;
+    }
+    const ready = docs.filter(isRagReady);
+    const needHint = $("assistant-need-analyze-hint");
+    if (ready.length === 0) {
+      // Keine RAG-bereiten Dokumente: Checkboxen sind deaktiviert —
+      // ohne Hinweis wüsste der Nutzer nicht, wo der nächste Schritt liegt.
+      const analyzing = docs.some(function (d) {
+        return d.status === "INDEXING";
+      });
+      needHint.hidden = false;
+      needHint.textContent = analyzing
+        ? "Indexierung läuft — die Dokumente sind für KI-Fragen bereit, sobald der Status «Volltext bereit» oder «KI-bereit» zeigt."
+        : "Diese Dokumente sind noch nicht für KI-Fragen bereit: in «Meine Normen» mit «Analysieren» indexieren.";
+    } else {
+      needHint.hidden = true;
     }
     $("assistant-docs-hint").hidden = true;
     $("assistant-docs").innerHTML = docs

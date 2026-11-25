@@ -2,12 +2,14 @@
 (async Analyse-Job) und ``GET /v1/documents/{id}`` (Detail inkl. Job-State).
 
 End-to-End über ``build_app`` mit injiziertem ShopState (Fake-SOAP-Client);
-Keyless-Betrieb → Index-Cache passiv, kein Klartext auf Disk (G4).
-Synthetische Testdaten (G4).
+Default Keyless-Betrieb → Index-Cache passiv, kein Klartext auf Disk (G4).
+Mit Statusschlüssel (``SIA_STATE_KEY_B64``) zusätzlich: Cache-Skip und
+Restore aus dem verschlüsselten Index-Cache. Synthetische Testdaten (G4).
 """
 
 from __future__ import annotations
 
+import base64
 import time
 from pathlib import Path
 from typing import cast
@@ -187,6 +189,67 @@ def test_req804_analyze_no_body_uses_configured_embedding_model(
         assert done["status"] == "done", done
         assert seen.get("model") == "embed-test"
         assert done["progress"] == "Volltextindex bereit; lokaler Embeddingdienst nicht erreichbar"
+
+
+def test_req804_analyze_second_run_is_skipped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Bereits auf Zielstufe indexiert (hier: Volltext) → zweiter
+    # «Analysieren»-Klick überspringt das Re-Indexing (doppelte Klicks
+    # bleiben billig; die Job-Queue ist Single-Worker).
+    client = _build(tmp_path, monkeypatch)
+    with client:
+        _login(client)
+        _download(client, "prod-101")
+        res = client.post("/v1/documents/prod-101/analyze", headers=HDRS, json={})
+        job = cast("dict[str, object]", res.json()["job"])
+        done = _wait_for_job(client, cast(str, job["id"]), {"done", "error"})
+        assert done["status"] == "done"
+        assert done["progress"] == "Volltextindex bereit"
+
+        res = client.post("/v1/documents/prod-101/analyze", headers=HDRS, json={})
+        assert res.status_code == 202, res.text
+        job = cast("dict[str, object]", res.json()["job"])
+        done = _wait_for_job(client, cast(str, job["id"]), {"done", "error"})
+        assert done["status"] == "done", done
+        assert done["progress"] == "Bereits analysiert (Volltext bereit)"
+
+
+def test_req804_analyze_restores_from_index_cache_after_relogin(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Mit Statusschlüssel persistiert die Pipeline den Index verschlüsselt
+    # (G4). Nach Neustart/erneutem Login (Registry + Pipeline leer, PDF
+    # neu heruntergeladen) stellt «Analysieren» den Index aus dem
+    # verschlüsselten Cache wieder her, statt das PDF erneut zu
+    # extrahieren/embedden.
+    client = _build(tmp_path, monkeypatch)
+    monkeypatch.setenv("SIA_STATE_KEY_B64", base64.b64encode(b"\x00" * 32).decode())
+    with client:
+        _login(client)
+        _download(client, "prod-101")
+        res = client.post("/v1/documents/prod-101/analyze", headers=HDRS, json={})
+        job = cast("dict[str, object]", res.json()["job"])
+        done = _wait_for_job(client, cast(str, job["id"]), {"done", "error"})
+        assert done["status"] == "done", done
+        assert done["progress"] == "Volltextindex bereit"
+        assert list((tmp_path / "data").rglob("*.sniidx")), "Index-Cache nicht persistiert"
+
+        # Neu-Login = simulierter Neustart: alte Sitzung wird verworfen
+        # (Registry, Pipeline, PDF-Cache leer), Katalog bleibt bestehen.
+        _login(client)
+        _download(client, "prod-101")
+        res = client.post("/v1/documents/prod-101/analyze", headers=HDRS, json={})
+        assert res.status_code == 202, res.text
+        job = cast("dict[str, object]", res.json()["job"])
+        done = _wait_for_job(client, cast(str, job["id"]), {"done", "error"})
+        assert done["status"] == "done", done
+        assert done["progress"] == "Volltextindex aus Cache wiederhergestellt"
+
+        documents = client.get("/v1/documents", headers=HDRS).json()
+        entry = next(d for d in documents if d["product_id"] == "prod-101")
+        assert entry["status"] == "FULLTEXT_READY"
+        assert entry["indexed_pages"] == 1
 
 
 # ------------------------------------------------------------------ Fehlerfälle

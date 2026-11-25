@@ -23,7 +23,7 @@ from enum import StrEnum
 
 from sni.documents.analysis import DocumentAnalysisPipeline
 from sni.documents.pdfcache import SessionDocumentCache
-from sni.documents.registry import LocalDocumentRegistry
+from sni.documents.registry import LocalDocumentRegistry, LocalDocumentStatus
 from sni.shop.catalog_xml import StandardDocument
 from sni.shop.service import LicenseSession, SiaProductService
 
@@ -169,6 +169,38 @@ class DownloadService:
             if document is None:
                 self._fail(job_id, None, "Dokument unbekannt im Katalog")
                 return
+            want = embedding_model.strip()
+            # Skip: bereits auf Zielstufe (Volltext) indexiert → kein
+            # Re-Indexing (doppelte «Analysieren»-Klicks bleiben billig).
+            state = self._registry.get(product_id)
+            current = state.status if state is not None else None
+            if (
+                current
+                in (
+                    LocalDocumentStatus.FULLTEXT_READY,
+                    LocalDocumentStatus.HYBRID_READY,
+                )
+                and not want
+            ):
+                self._update(
+                    job_id,
+                    status=JobStatus.DONE,
+                    progress="Bereits analysiert (" + current.value + ")",
+                )
+                return
+            # Fast Path: Index-Cache (AES-256-GCM, eine Datei pro Norm)
+            # statt Re-Extraktion/Re-Embedding — nur wenn die Zielstufe
+            # zum gespeicherten Eintrag passt (kein Modell oder identisch).
+            entry = pipeline.load_cached_entry(product_id)
+            if entry is not None and entry.pages and (not want or want == entry.embedding_model):
+                self._registry.indexing(document)
+                result = pipeline.restore_from_cache(entry, want)
+                if result is not None:
+                    self._registry.indexed(
+                        document, result.pages, result.embeddings_ready, result.message
+                    )
+                    self._update(job_id, status=JobStatus.DONE, progress=result.message)
+                    return
             self._registry.indexing(document)
             try:
                 result = pipeline.index(

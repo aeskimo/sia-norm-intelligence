@@ -25,10 +25,11 @@
     },
     norms: {
       title: "Hilfe: Meine Normen",
-      tip: "Ihre heruntergeladenen Normen. Die Liste bleibt nach Neustarts erhalten — die PDFs selbst sind nur während dieser Sitzung verfügbar und werden nach einem Neustart bei Bedarf neu heruntergeladen.",
+      tip: "Ihre heruntergeladenen Normen dieser Sitzung. Die PDFs liegen nur im verschlüsselten Sitzungscache — nach einem Neustart müssen die Normen neu heruntergeladen werden, die Analyse ist danach dank verschlüsseltem Index-Cache aber schnell (ohne erneutes Embedding, wenn das Modell gleich bleibt).",
       sections: [
         ["Status der Dokumente", "«Heruntergeladen» = PDF im (verschlüsselten) Sitzungscache. «Volltext bereit» = Text extrahiert und durchsuchbar — Voraussetzung für Fragen im Normenassistenten. «Volltext + Vektoren» = zusätzlich für die semantische Suche indexiert (braucht ein installiertes Embedding-Modell, sonst bleibt die Suche auf Volltext)."],
-        ["Jobs", "Download und Analyse laufen im Hintergrund; die Job-Zeile unten zeigt den Fortschritt. Fehler (z. B. Portal-Timeout) zeigt das jeweilige Job-Ergebnis."],
+        ["Analysieren", "«Analysieren» startet den Indexier-Job (Extraktion → Volltextindex, bei installiertem Embedding-Modell zusätzlich Vektoren). Bereits indexierte Dokumente werden übersprungen («Bereits analysiert»), beim erneuten Starten wird der verschlüsselte Index-Cache genutzt statt das PDF erneut zu verarbeiten."],
+        ["Jobs", "Downloads laufen im Hintergrund; die Job-Zeile unten zeigt den Fortschritt aller Download- und Analyse-Jobs. Fehler (z. B. Portal-Timeout) zeigt das jeweilige Job-Ergebnis."],
         ["PDF & Löschen", "Das PDF-Symbol öffnet die Vorschau. Löschen entfernt Cache und Index (Zeroing) und aktualisiert die Arbeitssets — die Norm bleibt im Katalog zum erneuten Download verfügbar."],
       ],
     },

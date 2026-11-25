@@ -103,6 +103,18 @@ def test_req814_norms_view_exposes_analyze() -> None:
     assert 'j.kind === "download" || j.kind === "analyze"' in js
 
 
+def test_req814_assistant_shows_analyze_hint_when_nothing_rag_ready() -> None:
+    # Given der Assistent soll sagen, wo der nächste Schritt liegt
+    # When die UI geprüft Then existiert ein Hinweis, der bei lokalen
+    # Dokumenten ohne RAG-Index (kein FULLTEXT/HYBRID-Status) auf
+    # «Meine Normen» → «Analysieren» verweist.
+    html = _read("index.html")
+    js = _read("app.js")
+    assert 'id="assistant-need-analyze-hint"' in html
+    assert "assistant-need-analyze-hint" in js
+    assert "isRagReady" in js.split("renderAssistantDocs")[1].split("function ")[0]
+
+
 def test_req814_assistant_has_model_dropdown() -> None:
     # Given das Antwortmodell pro Ansicht wählbar sein soll (User-Wunsch)
     # When die UI geprüft Then trägt die Assistent-View ein Antwortmodell-
