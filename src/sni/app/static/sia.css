@@ -253,6 +253,8 @@ select:focus-visible {
   cursor: default;
 }
 
+.btn[hidden] { display: none; }
+
 .card.dimmed { opacity: 0.65; }
 
 .error-text { color: var(--error); }
@@ -274,3 +276,134 @@ select:focus-visible {
   .btn-accent { color: #0A0A0A; }
   .chip-success { color: #30D158; }
 }
+
+/* --- Assistent (M8.4) ------------------------------------------------------ */
+
+.assistant-layout {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .assistant-layout { grid-template-columns: 1fr; }
+}
+
+.doc-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.doc-check input { flex: 0 0 auto; }
+
+.doc-check .doc-label { font-size: 13px; }
+
+.doc-check .muted { margin: 0; }
+
+.ask-question {
+  width: 100%;
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px;
+  resize: vertical;
+  color: var(--text);
+  background: var(--content);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-btn);
+  margin-bottom: 6px;
+}
+
+.answer-text {
+  white-space: pre-wrap;
+  min-height: 24px;
+  margin: 4px 0 8px;
+}
+
+.sources-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 10px 0 6px;
+}
+
+.answer-sources {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.source-item {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-btn);
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  background: var(--content);
+}
+
+.source-cite {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.source-quote {
+  margin: 6px 0 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--hairline);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* --- Modelle & Einstellungen (M8.4) ----------------------------------------- */
+
+.notice {
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-btn);
+  padding: 10px 12px;
+  margin: 8px 0;
+  font-size: 13px;
+}
+
+.notice a { color: var(--accent-bright); }
+
+.form-row {
+  display: flex;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.form-row input { flex: 1; }
+
+.pull-name { flex: 1; }
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.system-table th {
+  font-weight: 400;
+  color: var(--text-secondary);
+  border-bottom: none;
+  padding-right: 16px;
+  width: 160px;
+}
+
+.workset-scope-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.workset-scope-row select { flex: 1; }

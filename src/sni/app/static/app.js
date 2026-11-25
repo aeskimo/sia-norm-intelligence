@@ -55,6 +55,9 @@
 
   function render() {
     const view = currentView();
+    if (view !== "settings") {
+      settingsLoaded = false; // beim erneuten Betreten neu laden
+    }
     for (const name of VIEWS) {
       const section = $("view-" + name);
       if (section) {
@@ -94,6 +97,7 @@
     setLoginInputsEnabled(!loggedIn);
     if (!loggedIn) {
       state.catalog = [];
+      assistantState.checkedDocs.clear();
       $("catalog-hint").textContent = "Bitte zuerst einloggen.";
       $("catalog-hint").classList.remove("error-text");
       $("catalog-search").hidden = true;
@@ -308,6 +312,27 @@
     }
   }
 
+  async function openPdf(productId) {
+    try {
+      const res = await apiFetch(
+        "/v1/documents/" + encodeURIComponent(productId) + "/pdf"
+      );
+      if (!res.ok) {
+        throw new Error("HTTP " + res.status);
+      }
+      const blob = await res.blob();
+      const frame = $("pdf-frame");
+      if (frame.src.startsWith("blob:")) {
+        URL.revokeObjectURL(frame.src);
+      }
+      frame.src = URL.createObjectURL(blob);
+      $("pdf-title").textContent = "PDF-Vorschau: " + productId;
+      $("pdf-card").hidden = false;
+    } catch (err) {
+      $("jobs-line").textContent = "PDF konnte nicht geladen werden: " + err.message;
+    }
+  }
+
   $("norms-results").addEventListener("click", async function (event) {
     const removeButton = event.target.closest("button[data-remove]");
     if (removeButton) {
@@ -327,24 +352,530 @@
     if (!openButton) {
       return;
     }
-    const productId = openButton.getAttribute("data-open");
+    openPdf(openButton.getAttribute("data-open"));
+  });
+
+  /* --- Lokale Modelle (M8.4) -------------------------------------------------- */
+
+  function formatBytes(n) {
+    if (!n) {
+      return "–";
+    }
+    const gb = n / (1024 * 1024 * 1024);
+    if (gb >= 1) {
+      return gb.toFixed(1) + " GB";
+    }
+    return Math.max(1, Math.round(n / (1024 * 1024))) + " MB";
+  }
+
+  function formatModified(value) {
+    if (!value) {
+      return "–";
+    }
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? esc(value) : d.toLocaleDateString("de-CH");
+  }
+
+  function renderOllama(data) {
+    const chip = $("ollama-chip");
+    chip.hidden = false;
+    $("ollama-missing").hidden = data.available !== false;
+    if (data.available) {
+      chip.textContent = "verfügbar";
+      chip.className = "chip chip-success";
+      $("ollama-hint").textContent =
+        (data.models || []).length + " Modelle installiert.";
+      const rows = (data.models || [])
+        .map(function (m) {
+          return (
+            "<tr>" +
+            "<td>" + esc(m.name) + "</td>" +
+            "<td>" + formatBytes(m.size_bytes) + "</td>" +
+            "<td>" + formatModified(m.modified_at) + "</td>" +
+            '<td class="row-actions">' +
+            '<button class="btn btn-sm" data-use-model="' +
+            esc(m.name) + '">Für Fragen verwenden</button> ' +
+            '<button class="btn btn-sm" data-delete-model="' +
+            esc(m.name) + '">Löschen</button>' +
+            "</td></tr>"
+          );
+        })
+        .join("");
+      $("ollama-results").innerHTML = (data.models || []).length
+        ? "<table><thead><tr><th>Modell</th><th>Größe</th><th>Geändert</th>" +
+          "<th>Aktionen</th></tr></thead><tbody>" +
+          rows +
+          "</tbody></table>"
+        : "";
+    } else {
+      chip.textContent = "nicht erreichbar";
+      chip.className = "chip chip-error";
+      $("ollama-hint").textContent = "";
+      $("ollama-results").innerHTML = "";
+    }
+  }
+
+  function renderGibbModels(data) {
+    const hint = $("gibb-models-hint");
+    const row = $("gibb-models");
+    if (data.available) {
+      hint.textContent = "Verfügbare gibb-Modelle:";
+      row.innerHTML = (data.models || [])
+        .map(function (m) {
+          return '<span class="chip chip-accent">' + esc(m) + "</span>";
+        })
+        .join("");
+    } else {
+      hint.textContent =
+        "Nicht verfügbar (kein API-Key oder kein Modell konfiguriert, nicht erreichbar).";
+      row.innerHTML = "";
+    }
+  }
+
+  function renderModelJobs(jobs) {
+    const line = $("models-jobs-line");
+    const pulls = jobs.filter(function (j) {
+      return j.kind === "pull";
+    });
+    const pull = pulls.length ? pulls[pulls.length - 1] : null;
+    if (!pull) {
+      line.textContent = "";
+      line.classList.remove("error-text");
+      return;
+    }
+    if (pull.status === "queued" || pull.status === "running") {
+      line.textContent = "Pull: " + (pull.progress || "arbeitet …");
+      line.classList.remove("error-text");
+    } else if (pull.status === "error") {
+      line.textContent = "Fehler: " + (pull.error || "unbekannt");
+      line.classList.add("error-text");
+    } else {
+      line.textContent = "Fertig: " + (pull.progress || "abgeschlossen");
+      line.classList.remove("error-text");
+    }
+  }
+
+  async function refreshModels() {
     try {
-      const res = await apiFetch(
-        "/v1/documents/" + encodeURIComponent(productId) + "/pdf"
-      );
-      if (!res.ok) {
-        throw new Error("HTTP " + res.status);
-      }
-      const blob = await res.blob();
-      const frame = $("pdf-frame");
-      if (frame.src.startsWith("blob:")) {
-        URL.revokeObjectURL(frame.src);
-      }
-      frame.src = URL.createObjectURL(blob);
-      $("pdf-title").textContent = "PDF-Vorschau: " + productId;
-      $("pdf-card").hidden = false;
+      renderOllama(await apiJson("/v1/models/ollama"));
     } catch (err) {
-      $("jobs-line").textContent = "PDF konnte nicht geladen werden: " + err.message;
+      $("ollama-hint").textContent = "Keine Verbindung: " + err.message;
+    }
+    try {
+      renderGibbModels(await apiJson("/v1/models/gibb"));
+    } catch (err) {
+      /* ignoriert (gibb optional) */
+    }
+    try {
+      renderModelJobs(await apiJson("/v1/jobs"));
+    } catch (err) {
+      /* ignoriert */
+    }
+  }
+
+  $("models-refresh").addEventListener("click", refreshModels);
+
+  $("models-pull").addEventListener("click", async function () {
+    const name = $("pull-name").value.trim();
+    if (!name) {
+      setStatus($("view-models"), "error", "Modellname fehlt.");
+      return;
+    }
+    try {
+      await apiJson("/v1/models/ollama/" + encodeURIComponent(name) + "/pull", {
+        method: "POST"
+      });
+      $("pull-name").value = "";
+      setStatus($("view-models"), "neutral", "Pull eingereiht: " + name);
+      await refreshModels();
+    } catch (err) {
+      setStatus($("view-models"), "error", err.message);
+    }
+  });
+
+  $("ollama-results").addEventListener("click", async function (event) {
+    const useButton = event.target.closest("button[data-use-model]");
+    if (useButton) {
+      const name = useButton.getAttribute("data-use-model");
+      try {
+        await apiJson("/v1/settings", {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ generation_model: name })
+        });
+        setStatus($("view-models"), "success", "Frage-Modell gesetzt: " + name);
+      } catch (err) {
+        setStatus($("view-models"), "error", err.message);
+      }
+      return;
+    }
+    const deleteButton = event.target.closest("button[data-delete-model]");
+    if (!deleteButton) {
+      return;
+    }
+    const name = deleteButton.getAttribute("data-delete-model");
+    if (!window.confirm("Modell \"" + name + "\" löschen?")) {
+      return;
+    }
+    try {
+      await apiJson("/v1/models/ollama/" + encodeURIComponent(name), {
+        method: "DELETE"
+      });
+      setStatus($("view-models"), "success", "Modell gelöscht: " + name);
+      await refreshModels();
+    } catch (err) {
+      setStatus($("view-models"), "error", err.message);
+    }
+  });
+
+  /* --- Einstellungen (M8.4) ---------------------------------------------------- */
+
+  let settingsLoaded = false;
+
+  async function loadSettings() {
+    try {
+      const data = await apiJson("/v1/settings");
+      $("set-generation-model").value = data.generation_model;
+      $("set-embedding-model").value = data.embedding_model;
+      $("set-provider").value = data.provider;
+      $("set-approval-name").value = data.approval_name;
+      $("set-gibb-base-url").value = data.gibb_base_url;
+      $("set-gibb-model").value = data.gibb_model;
+      $("set-gibb-key").value = "";
+      $("set-data-dir").textContent = data.data_dir;
+      $("set-state-key").textContent = data.state_key_set
+        ? "vorhanden (Umgebungsvariable oder Keyring)"
+        : "nicht vorhanden";
+      $("set-gibb-key-state").textContent = data.gibb_key_set
+        ? "im OS-Keyring gespeichert"
+        : "nicht gespeichert";
+      settingsLoaded = true;
+    } catch (err) {
+      $("settings-message").textContent = "Keine Verbindung: " + err.message;
+      $("settings-message").classList.add("error-text");
+    }
+  }
+
+  $("settings-form").addEventListener("submit", async function (event) {
+    event.preventDefault();
+    const key = $("set-gibb-key").value;
+    const body = {
+      generation_model: $("set-generation-model").value,
+      embedding_model: $("set-embedding-model").value,
+      provider: $("set-provider").value,
+      approval_name: $("set-approval-name").value,
+      gibb_base_url: $("set-gibb-base-url").value,
+      gibb_model: $("set-gibb-model").value
+    };
+    if (key.trim()) {
+      body.gibb_key = key;
+    }
+    $("settings-save").disabled = true;
+    $("settings-message").textContent = "Speichern …";
+    $("settings-message").classList.remove("error-text");
+    try {
+      await apiJson("/v1/settings", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      $("set-gibb-key").value = "";
+      $("settings-message").textContent = "Gespeichert.";
+      $("settings-message").classList.remove("error-text");
+    } catch (err) {
+      $("settings-message").textContent = err.message;
+      $("settings-message").classList.add("error-text");
+    } finally {
+      $("settings-save").disabled = false;
+    }
+  });
+
+  /* --- Assistent (M8.4) ---------------------------------------------------------- */
+
+  const assistantState = {
+    checkedDocs: new Set(),
+    asking: false
+  };
+
+  function isRagReady(doc) {
+    return doc.status === "FULLTEXT_READY" || doc.status === "HYBRID_READY";
+  }
+
+  function renderAssistantDocs(docs) {
+    if (!docs.length) {
+      $("assistant-docs-hint").hidden = false;
+      $("assistant-docs").innerHTML = "";
+      return;
+    }
+    $("assistant-docs-hint").hidden = true;
+    $("assistant-docs").innerHTML = docs
+      .map(function (d) {
+        const ready = isRagReady(d);
+        const checked = ready && assistantState.checkedDocs.has(d.product_id);
+        return (
+          '<label class="doc-check">' +
+          '<input type="checkbox" data-assistant-doc="' +
+          esc(d.product_id) + '"' +
+          (checked ? " checked" : "") +
+          (ready ? "" : " disabled") +
+          '><span class="doc-label">' +
+          esc(d.number) + " " + esc(d.title) + "</span> " +
+          (ready ? "" : '<span class="muted">(' + esc(d.status_label) + ")</span>") +
+          "</label>"
+        );
+      })
+      .join("");
+  }
+
+  function renderWorksets(worksets) {
+    const select = $("workset-scope");
+    const current = select.value;
+    select.innerHTML =
+      '<option value="">(kein Arbeitsset)</option>' +
+      worksets
+        .map(function (w) {
+          return (
+            '<option value="' +
+            esc(w.name) +
+            '">' +
+            esc(w.name) +
+            " (" +
+            w.document_ids.length +
+            ")</option>"
+          );
+        })
+        .join("");
+    if (worksets.some(function (w) {
+      return w.name === current;
+    })) {
+      select.value = current;
+    }
+    $("workset-list").innerHTML = worksets
+      .map(function (w) {
+        return (
+          '<div class="doc-check">' +
+          '<span class="doc-label">' +
+          esc(w.name) +
+          ' <span class="muted">' +
+          w.document_ids.length +
+          " Dokumente</span></span> " +
+          '<button class="btn btn-sm" data-delete-workset="' +
+          esc(w.name) + '">Löschen</button>' +
+          "</div>"
+        );
+      })
+      .join("");
+  }
+
+  async function refreshAssistant() {
+    if (!state.loggedIn) {
+      $("assistant-docs-hint").hidden = false;
+      $("assistant-docs-hint").textContent =
+        "Bitte zuerst im Normenkatalog einloggen.";
+      $("assistant-docs").innerHTML = "";
+      $("workset-scope").innerHTML =
+        '<option value="">(kein Arbeitsset)</option>';
+      $("workset-list").innerHTML = "";
+      return;
+    }
+    try {
+      const [docs, worksets] = await Promise.all([
+        apiJson("/v1/documents"),
+        apiJson("/v1/worksets")
+      ]);
+      renderAssistantDocs(docs);
+      renderWorksets(worksets);
+    } catch (err) {
+      $("workset-message").textContent = "Keine Verbindung: " + err.message;
+    }
+  }
+
+  $("assistant-docs").addEventListener("change", function (event) {
+    const box = event.target.closest("input[data-assistant-doc]");
+    if (!box) {
+      return;
+    }
+    const id = box.getAttribute("data-assistant-doc");
+    if (box.checked) {
+      assistantState.checkedDocs.add(id);
+    } else {
+      assistantState.checkedDocs.delete(id);
+    }
+  });
+
+  $("workset-create").addEventListener("click", async function () {
+    const name = $("workset-name").value.trim();
+    if (!name) {
+      return;
+    }
+    try {
+      await apiJson("/v1/worksets", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: name })
+      });
+      $("workset-name").value = "";
+      $("workset-message").textContent = "Arbeitsset angelegt.";
+      await refreshAssistant();
+    } catch (err) {
+      $("workset-message").textContent = err.message;
+    }
+  });
+
+  $("workset-list").addEventListener("click", async function (event) {
+    const button = event.target.closest("button[data-delete-workset]");
+    if (!button) {
+      return;
+    }
+    const name = button.getAttribute("data-delete-workset");
+    try {
+      await apiJson("/v1/worksets/" + encodeURIComponent(name), {
+        method: "DELETE"
+      });
+      $("workset-message").textContent = "Arbeitsset gelöscht: " + name;
+      await refreshAssistant();
+    } catch (err) {
+      $("workset-message").textContent = err.message;
+    }
+  });
+
+  function setAnswerBusy(busy) {
+    assistantState.asking = busy;
+    $("ask-button").disabled = busy;
+    $("ask-button").textContent = busy ? "Wird generiert …" : "Fragen";
+  }
+
+  function renderSources(sources) {
+    $("sources-title").hidden = !sources.length;
+    $("answer-sources").innerHTML = sources
+      .map(function (s) {
+        const docId = String(s.source_id || "").split(":")[0];
+        const where =
+          "Seite " + s.page + (s.section ? ", Abschnitt " + s.section : "");
+        return (
+          '<li class="source-item">' +
+          '<div class="source-cite"><span>' +
+          esc(s.standard) +
+          (s.edition ? " " + esc(s.edition) : "") +
+          " · " +
+          where +
+          '</span><button class="btn btn-sm" data-open-source="' +
+          esc(docId) + '">Öffnen</button></div>' +
+          (s.text ? '<p class="source-quote">„' + esc(s.text) + "“</p>" : "") +
+          "</li>"
+        );
+      })
+      .join("");
+  }
+
+  /* SSE-Block auswerten (Stream-Adapter, 09 §6.2). */
+  function handleSseBlock(block) {
+    let event = null;
+    let data = null;
+    for (const line of block.split("\n")) {
+      if (line.startsWith("event: ")) {
+        event = line.slice(7);
+      } else if (line.startsWith("data: ")) {
+        try {
+          data = JSON.parse(line.slice(6));
+        } catch (err) {
+          data = null;
+        }
+      }
+    }
+    if (!event) {
+      return null;
+    }
+    if (event === "token" && data && data.text) {
+      $("answer-text").textContent += data.text;
+    } else if (event === "sources" && data && data.sources) {
+      renderSources(data.sources);
+    } else if (event === "answer" && data) {
+      $("answer-model").textContent = data.model_id ? "· " + data.model_id : "";
+      $("answer-disclaimer").textContent = data.disclaimer || "";
+      setStatus($("view-assistant"), "success", "Antwort fertig.");
+    } else if (event === "error" && data) {
+      $("answer-text").textContent = "Fehler: " + data.error;
+      setStatus($("view-assistant"), "error", "Fehler bei der Frage.");
+    }
+    return event;
+  }
+
+  $("answer-sources").addEventListener("click", function (event) {
+    const button = event.target.closest("button[data-open-source]");
+    if (!button) {
+      return;
+    }
+    const docId = button.getAttribute("data-open-source");
+    window.location.hash = "#/norms";
+    openPdf(docId);
+  });
+
+  $("ask-button").addEventListener("click", async function () {
+    const question = $("ask-question").value.trim();
+    if (!question || assistantState.asking) {
+      return;
+    }
+    if (!state.loggedIn) {
+      setStatus($("view-assistant"), "error", "Bitte zuerst einloggen.");
+      return;
+    }
+    const scope = {};
+    if (assistantState.checkedDocs.size) {
+      scope.document_ids = Array.from(assistantState.checkedDocs);
+    }
+    if ($("workset-scope").value) {
+      scope.workset_id = $("workset-scope").value;
+    }
+    setAnswerBusy(true);
+    $("answer-card").hidden = false;
+    $("answer-text").textContent = "";
+    $("answer-model").textContent = "";
+    $("answer-disclaimer").textContent = "";
+    $("sources-title").hidden = true;
+    $("answer-sources").innerHTML = "";
+    try {
+      const res = await apiFetch("/v1/ask", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          question: question,
+          scope: Object.keys(scope).length ? scope : null
+        })
+      });
+      if (!res.ok || !res.body) {
+        let detail = "HTTP " + res.status;
+        try {
+          const d = await res.json();
+          if (d.error) {
+            detail = d.error;
+          }
+        } catch (err) {
+          /* Standardmeldung behalten */
+        }
+        throw new Error(detail);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      for (;;) {
+        const chunk = await reader.read();
+        if (chunk.done) {
+          break;
+        }
+        buffer += decoder.decode(chunk.value, { stream: true });
+        let sep;
+        while ((sep = buffer.indexOf("\n\n")) >= 0) {
+          const block = buffer.slice(0, sep);
+          buffer = buffer.slice(sep + 2);
+          handleSseBlock(block);
+        }
+      }
+    } catch (err) {
+      $("answer-text").textContent = "Fehler: " + err.message;
+      setStatus($("view-assistant"), "error", "Fehler bei der Frage.");
+    } finally {
+      setAnswerBusy(false);
     }
   });
 
@@ -386,8 +917,18 @@
         setStatus(section, "error", "Keine Verbindung zur App-API (" + err.message + ").");
       }
     }
-    if (state.loggedIn && currentView() === "norms") {
+    const view = currentView();
+    if (state.loggedIn && view === "norms") {
       refreshNorms();
+    }
+    if (view === "assistant") {
+      refreshAssistant();
+    }
+    if (view === "models") {
+      refreshModels();
+    }
+    if (view === "settings" && !settingsLoaded) {
+      loadSettings();
     }
   }
 
