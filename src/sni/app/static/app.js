@@ -278,6 +278,8 @@
               '<td class="row-actions">' +
               '<button class="btn btn-sm" data-open="' + esc(d.product_id) +
               '">PDF öffnen</button> ' +
+              '<button class="btn btn-sm" data-analyze="' + esc(d.product_id) +
+              '">Analysieren</button> ' +
               '<button class="btn btn-sm" data-remove="' + esc(d.product_id) +
               '">Entfernen</button>' +
               "</td></tr>"
@@ -288,7 +290,10 @@
     }
     const active = jobs.filter(
       function (j) {
-        return j.kind === "download" && (j.status === "queued" || j.status === "running");
+        return (
+          (j.kind === "download" || j.kind === "analyze") &&
+          (j.status === "queued" || j.status === "running")
+        );
       }
     );
     const last = jobs.length ? jobs[jobs.length - 1] : null;
@@ -297,10 +302,10 @@
     if (active.length) {
       const j = active[0];
       text = "Job: " + (j.progress || "arbeitet …");
-    } else if (last && last.kind === "download" && last.status === "error") {
+    } else if (last && (last.kind === "download" || last.kind === "analyze") && last.status === "error") {
       text = "Fehler: " + (last.error || "unbekannt");
       isError = true;
-    } else if (last && last.kind === "download" && last.status === "done") {
+    } else if (last && (last.kind === "download" || last.kind === "analyze") && last.status === "done") {
       text = "Fertig: " + (last.progress || "abgeschlossen");
     }
     $("jobs-line").textContent = text;
@@ -357,6 +362,21 @@
       return;
     }
     const openButton = event.target.closest("button[data-open]");
+    const analyzeButton = event.target.closest("button[data-analyze]");
+    if (analyzeButton) {
+      const productId = analyzeButton.getAttribute("data-analyze");
+      try {
+        await apiJson(
+          "/v1/documents/" + encodeURIComponent(productId) + "/analyze",
+          { method: "POST" }
+        );
+        await refreshNorms();
+      } catch (err) {
+        $("jobs-line").textContent = err.message;
+        $("jobs-line").classList.add("error-text");
+      }
+      return;
+    }
     if (!openButton) {
       return;
     }

@@ -650,13 +650,21 @@ def document_detail(document_id: str, request: Request) -> JSONResponse:
 def document_analyze(
     document_id: str, request: Request, payload: AnalyzeRequest | None = None
 ) -> JSONResponse:
-    """09 §6.2: async Analyse-Job (Extraktion → Volltext- → Vektorindex)."""
+    """09 §6.2: async Analyse-Job (Extraktion → Volltext- → Vektorindex).
+
+    Ohne Body → konfiguriertes Embedding-Modell (Einstellungen);
+    Body mit leerem ``embedding_model`` → nur Volltextindex.
+    """
     bundle = _require_bundle(request)
     if isinstance(bundle, JSONResponse):
         return bundle
     if bundle.registry.get(document_id) is None:
         return _error(404, "Dokument nicht in der lokalen Registry")
-    model = payload.embedding_model.strip() if payload is not None else ""
+    if payload is None:
+        state = load_workspace_json(_shop(request).data_dir) or {}
+        model = str(state.get("embedding_model") or "").strip()
+    else:
+        model = payload.embedding_model.strip()
     job = bundle.downloads.submit_analyze(document_id, model)
     return JSONResponse(
         {"status": "accepted", "job": _job(job), "disclaimer": DISCLAIMER},

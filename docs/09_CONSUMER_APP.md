@@ -215,7 +215,7 @@ Sicherheit: §10.2 (zufälliger Port, Session-Token, Host/Origin-Check).
 | `GET` | `/v1/documents` | Registry → `[sni:local_document]` |
 | `GET` | `/v1/documents/{id}` | Detail inkl. Job-State |
 | `DELETE` | `/v1/documents/{id}` | Cache + Index entfernen |
-| `POST` | `/v1/documents/{id}/analyze` | async Job: Extraktion → Volltext- → Vektorindex |
+| `POST` | `/v1/documents/{id}/analyze` | async Job: Extraktion → Volltext- → Vektorindex (ohne Body → konfiguriertes Embedding-Modell; leeres `embedding_model` → nur Volltext) |
 | `GET` | `/v1/documents/{id}/pdf` | Session-PDF-Bytes (`application/pdf`) — nur während Sitzung (G4-Policy bleibt) |
 | `POST` | `/v1/ask` | `{question, scope: {document_ids?, workset_id?}}` → **SSE**: `token`-Events, finales `answer`-Event (`sni:rag_answer`) |
 | `GET/POST` | `/v1/worksets`, `PUT/DELETE /v1/worksets/{id}` | Arbeitssets → `sni:workset` |

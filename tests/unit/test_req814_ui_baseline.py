@@ -91,6 +91,17 @@ def test_req814_js_handles_session_token_in_memory() -> None:
     assert "history.replaceState" in js
 
 
+def test_req814_norms_view_exposes_analyze() -> None:
+    # Given 09 §5.1 (Aktionen der Normen-View: Öffnen, Analysieren, Entfernen)
+    # When die UI geprüft Then ist der API-Endpunkt REQ-804 auch in der UI
+    # verfügbar («Analysieren»-Button pro Dokument) und die Job-Zeile zeigt
+    # Analyse-Jobs (download + analyze) an.
+    js = _read("app.js")
+    assert 'data-analyze="' in js, "«Analysieren»-Button fehlt in der Normen-View"
+    assert "/analyze" in js, "Analyse-Endpunkt nicht in der UI verdrahtet"
+    assert 'j.kind === "download" || j.kind === "analyze"' in js
+
+
 def test_req814_help_covers_all_work_views() -> None:
     # Given die Bereichshilfe When geprüft Then jeder Arbeitsbereich (ohne
     # die Onboarding-View, die selbst die Hilfe ist) hat einen Eintrag mit

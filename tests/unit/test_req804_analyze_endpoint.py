@@ -151,6 +151,44 @@ def test_req804_analyze_without_body_defaults_to_fulltext(
         assert done["progress"] == "Volltextindex bereit"
 
 
+def test_req804_analyze_no_body_uses_configured_embedding_model(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Ohne Body wird das konfigurierte Embedding-Modell (Einstellungen)
+    # an die Pipeline übergeben. Der Provider wird gestubbt
+    # (deterministisch, auch bei laufendem Ollama): Dienst nicht
+    # erreichbar → sanfte Degradation (Volltext bleibt, Embedding entfällt).
+    seen: dict[str, str] = {}
+
+    class _StubProvider:
+        def __init__(self, url: str, model: str) -> None:
+            seen["model"] = model
+
+        def available(self) -> bool:
+            return False
+
+    import sni.documents.analysis as analysis_mod
+
+    monkeypatch.setattr(analysis_mod, "OllamaEmbeddingProvider", _StubProvider)
+    client = _build(tmp_path, monkeypatch)
+    with client:
+        _login(client)
+        _download(client, "prod-101")
+        res = client.put(
+            "/v1/settings",
+            headers=HDRS,
+            json={"embedding_model": "embed-test"},
+        )
+        assert res.status_code == 200, res.text
+        res = client.post("/v1/documents/prod-101/analyze", headers=HDRS)
+        assert res.status_code == 202, res.text
+        job = cast("dict[str, object]", res.json()["job"])
+        done = _wait_for_job(client, cast(str, job["id"]), {"done", "error"})
+        assert done["status"] == "done", done
+        assert seen.get("model") == "embed-test"
+        assert done["progress"] == "Volltextindex bereit; lokaler Embeddingdienst nicht erreichbar"
+
+
 # ------------------------------------------------------------------ Fehlerfälle
 
 
