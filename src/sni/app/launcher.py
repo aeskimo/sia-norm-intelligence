@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import os
+import sys
 import threading
 import webbrowser
 
@@ -21,6 +22,7 @@ import uvicorn
 
 from sni.app.security import new_session_token
 from sni.app.server import HOST, build_app, pick_free_port, start_server_thread, ui_url
+from sni.state.migrate import migrate
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -101,6 +103,9 @@ def run_window(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     """Einstiegspunkt für ``python -m sni.app``."""
     args = parse_args(argv)
+    report = migrate()  # Java-Stand → Python-Zielzustand, vor dem Server (ADR-0011 Punkt 7)
+    if report.workspace_problem is not None:
+        print(f"Hinweis: {report.workspace_problem}", file=sys.stderr)
     if args.headless:
         return run_headless(args)
     if args.browser:

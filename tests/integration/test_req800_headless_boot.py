@@ -15,17 +15,22 @@ from sni.app.server import HOST, pick_free_port, wait_ready
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_req800_headless_subprocess_boots() -> None:
+def test_req800_headless_subprocess_boots(tmp_path: Path) -> None:
     # Given `python -m sni.app --headless` (Subprocess) When /v1/status mit Token
     # Then 200 — der Launcher funktioniert End-to-End (REQ-800)
+    # Isolation: eigene User-Daten + Fake-Keyring, damit der Boot weder die
+    # reale `~/.sia-normenassistent` noch den echten Keychain antastet.
     port = pick_free_port()
+    env = dict(os.environ)
+    env["SIA_DATA_DIR"] = str(tmp_path / "data")
+    env["SIA_FAKE_KEYCHAIN"] = str(tmp_path / "keychain")
     proc = subprocess.Popen(
         [sys.executable, "-m", "sni.app", "--headless", "--port", str(port)],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
         cwd=str(REPO_ROOT),
-        env=dict(os.environ),
+        env=env,
     )
     assert proc.stdout is not None
     try:
