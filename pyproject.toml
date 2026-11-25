@@ -23,6 +23,11 @@ dependencies = [
     "httpx>=0.27",
     # Credentials/Statusschlüssel (REQ-802, ADR-0009, sni/secrets/).
     "keyring>=24.3,<27",
+    # PDF-Textextraktion für die lokale Analyse-Pipeline (REQ-804, ADR-0011,
+    # OQ-010): pypdfium2 (primär, Binaries im Wheel) + pdfminer.six
+    # (Gegenkandidat des Fixture-Gates); beide MIT, kein Copyleft.
+    "pypdfium2>=5.0",
+    "pdfminer.six>=20221105",
 ]
 
 [project.optional-dependencies]
