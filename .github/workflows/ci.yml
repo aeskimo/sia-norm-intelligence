@@ -262,7 +262,7 @@ jobs:
         env:
           SIA_DATA_DIR: ${{ runner.temp }}/sia-installer-data
         run: |
-          .venv/bin/python - <<'PYEOF'
+          python - <<'PYEOF'
           import os
           import sqlite3
           from pathlib import Path
@@ -283,6 +283,9 @@ jobs:
         env:
           SIA_DATA_DIR: ${{ runner.temp }}/sia-installer-data
           SIA_FAKE_KEYCHAIN: ${{ runner.temp }}/sia-installer-keychain
+          # ubuntu-latest ist x86_64 (explizit, damit appimagetool die
+          # Architektur nicht raten muss).
+          ARCH: "x86_64"
           XDG_RUNTIME_DIR: ""
           NO_AT_BRIDGE: "1"
         run: |
@@ -290,7 +293,9 @@ jobs:
             "https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage"
           echo "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0  appimagetool-x86_64.AppImage" | sha256sum -c -
           chmod +x appimagetool-x86_64.AppImage
-          # AppDir (Payload = der onedir-Build; Symlink, appimagetool folgt ihm)
+          # AppDir (Payload = KOPIE des onedir-Builds; appimagetool folgt
+          # Symlinks in der Architecture-Erkennung nicht und würde den
+          # absoluten Symlink unverändert übernehmen → kaputter AppImage)
           rm -rf build/appimage
           mkdir -p build/appimage
           cat > build/appimage/AppRun <<'APPRUN'
@@ -300,7 +305,7 @@ jobs:
           chmod +x build/appimage/AppRun
           cp packaging/sia-normenassistent.desktop build/appimage/
           cp packaging/icon/app-icon-512.png build/appimage/SIA-Normenassistent.png
-          ln -s "$(pwd)/dist/SIA-Normenassistent" build/appimage/SIA-Normenassistent
+          cp -a dist/SIA-Normenassistent build/appimage/
           # Extract-and-Run: braucht keinen FUSE-Support auf dem Runner.
           APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool-x86_64.AppImage \
             build/appimage "dist/SIA-Normenassistent-x86_64.AppImage"
