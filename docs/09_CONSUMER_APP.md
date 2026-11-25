@@ -455,6 +455,29 @@ Folgen für die Erstnutzung:
   «Weitere Informationen» → «Trotzdem ausführen».
 - **Linux:** AppImage zusätzlich `chmod +x` (Standard, signing-unabhängig).
 
+**M10-Signing-Setup (CI-Gerüst vorhanden, Credentials TODO):** Die
+Signing-Steps stehen in der CI (`installers`-Job, zwischen Build und
+Smoke) und greifen nur, wenn die zugehörigen Flags gesetzt sind
+(Setup in Repo-Settings → Settings → Security → Secrets and variables →
+Actions):
+
+- **macOS (REQ-1000):** Variablen `MACOS_SIGNING_ENABLED=true`,
+  `MACOS_SIGNING_IDENTITY` (z. B. `Developer ID Application: NAME
+  (TEAMID)`), `APPLE_TEAM_ID`; Secrets `MACOS_SIGNING_CERT`
+  (base64-`.p12`), `MACOS_SIGNING_CERT_PASSWORD`, `APPLE_ID`,
+  `APPLE_APP_PASSWORD`. Skript: `packaging/sign/macos_sign.sh`
+  (Temp-Keychain → codesign hardened-runtime → notarytool `--wait` →
+  staple; Notarization-JSON → Artefact).
+- **Windows (REQ-1001):** Variable `WINDOWS_SIGNING_ENABLED=true`;
+  Secrets `WINDOWS_SIGNING_CERT` (base64-`.pfx`),
+  `WINDOWS_SIGNING_CERT_PASSWORD`. Skript:
+  `packaging/sign/windows_sign.sh` (signtool SHA-256 + TSA;
+  verify-Ausgabe → Artefact).
+
+Ohne Flags bleibt der M8.6-Zustand (unsigned + o. Hinweise)
+bestehen; die Pipeline wird nie an fehlenden Credentials gehängt
+(REQ-1002).
+
 ## 12. Teststrategie
 
 - **Unit/Integration (pytest, existierendes Muster):** je Modul;

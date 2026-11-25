@@ -220,6 +220,24 @@ jobs:
       - name: "Build Installer (make package)"
         shell: bash
         run: make package
+      - name: "Sign macOS .app (M10, REQ-1000: nur bei vars.MACOS_SIGNING_ENABLED)"
+        if: runner.os == 'macOS' && vars.MACOS_SIGNING_ENABLED == 'true'
+        shell: bash
+        env:
+          MACOS_SIGNING_CERT: ${{ secrets.MACOS_SIGNING_CERT }}
+          MACOS_SIGNING_CERT_PASSWORD: ${{ secrets.MACOS_SIGNING_CERT_PASSWORD }}
+          MACOS_SIGNING_IDENTITY: ${{ vars.MACOS_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: bash packaging/sign/macos_sign.sh dist/SIA-Normenassistent.app
+      - name: "Sign Windows EXE (M10, REQ-1001: nur bei vars.WINDOWS_SIGNING_ENABLED)"
+        if: runner.os == 'Windows' && vars.WINDOWS_SIGNING_ENABLED == 'true'
+        shell: bash
+        env:
+          WINDOWS_SIGNING_CERT: ${{ secrets.WINDOWS_SIGNING_CERT }}
+          WINDOWS_SIGNING_CERT_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERT_PASSWORD }}
+        run: bash packaging/sign/windows_sign.sh dist/SIA-Normenassistent.exe
       - name: "Launch-Smoke (Fenster-Auto-Close, Seed beim ersten Start)"
         shell: bash
         env:
