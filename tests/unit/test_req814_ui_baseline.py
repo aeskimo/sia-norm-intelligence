@@ -115,6 +115,18 @@ def test_req814_assistant_shows_analyze_hint_when_nothing_rag_ready() -> None:
     assert "isRagReady" in js.split("renderAssistantDocs")[1].split("function ")[0]
 
 
+def test_req814_catalog_language_filter() -> None:
+    # Given die Sprache ist ein Feld des Katalog-Datenmodells
+    # (Normenwerk/EU/Wegeleitung und Fachrichtung nicht)
+    # When die UI geprüft Then gibt es einen Sprachfilter neben der Suche,
+    # dessen Optionen aus dem geladenen Katalog abgeleitet werden.
+    html = _read("index.html")
+    js = _read("app.js")
+    assert 'id="catalog-lang"' in html, "Sprachfilter fehlt im Normenkatalog"
+    assert "renderCatalogLangOptions" in js
+    assert "d.language !== lang" in js, "Sprachfilter nicht in renderCatalog verdrahtet"
+
+
 def test_req814_workset_document_assignment() -> None:
     # Given Arbeitssets sind Scope-Gruppen mit Dokument-Liste
     # (PUT /v1/worksets/{name}) When die UI geprüft Then gibt es einen

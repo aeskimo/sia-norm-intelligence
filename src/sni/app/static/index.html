@@ -61,7 +61,12 @@
         <div class="card" id="catalog-card">
           <h2 class="card-title">Katalog</h2>
           <p class="muted" id="catalog-hint">Bitte zuerst einloggen.</p>
-          <input id="catalog-search" class="search" placeholder="Suche: Nummer, Titel, Stichwort" hidden>
+          <div class="form-row">
+            <input id="catalog-search" class="search" placeholder="Suche: Nummer, Titel, Stichwort" hidden>
+            <select id="catalog-lang" aria-label="Sprache" hidden>
+              <option value="">(alle Sprachen)</option>
+            </select>
+          </div>
           <div id="catalog-results" class="table-wrap"></div>
         </div>
         <div class="status-row" aria-live="polite"><span class="status-dot neutral" aria-hidden="true"></span><span class="status-text">Bereit.</span></div>

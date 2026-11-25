@@ -105,6 +105,7 @@
       $("catalog-hint").textContent = "Bitte zuerst einloggen.";
       $("catalog-hint").classList.remove("error-text");
       $("catalog-search").hidden = true;
+      $("catalog-lang").hidden = true;
       $("catalog-results").innerHTML = "";
       $("pdf-card").hidden = true;
       $("norms-hint").textContent =
@@ -141,6 +142,7 @@
       $("catalog-hint").textContent = state.catalog.length + " Normen im Lizenz-Katalog.";
       $("catalog-hint").classList.remove("error-text");
       $("catalog-search").hidden = false;
+      $("catalog-lang").hidden = false;
       renderCatalog();
       if (data.keyring && data.keyring !== "ok") {
         setLoginMessage("Eingeloggt. " + data.keyring, true);
@@ -180,10 +182,48 @@
 
   /* --- Katalog --------------------------------------------------------------- */
 
+  /* Sprachfilter: die Sprache kommt aus dem Katalog (Feld ``language``,
+     z. B. «DE»); Normenwerk/EU/Wegeleitung und Fachrichtung sind keine
+     Katalog-Felder und damit nicht filterbar. */
+  const LANG_LABELS = {
+    DE: "Deutsch",
+    FR: "Französisch",
+    IT: "Italienisch",
+    EN: "Englisch",
+    NL: "Niederländisch"
+  };
+
+  function langLabel(code) {
+    return LANG_LABELS[String(code || "").toUpperCase()] || code;
+  }
+
+  function renderCatalogLangOptions() {
+    const select = $("catalog-lang");
+    const current = select.value;
+    const langs = Array.from(
+      new Set(state.catalog.map(function (d) { return d.language; }).filter(Boolean))
+    ).sort();
+    select.innerHTML =
+      '<option value="">(alle Sprachen)</option>' +
+      langs
+        .map(function (l) {
+          return '<option value="' + esc(l) + '">' + esc(langLabel(l)) + "</option>";
+        })
+        .join("");
+    if (langs.indexOf(current) >= 0) {
+      select.value = current;
+    }
+  }
+
   function renderCatalog() {
+    renderCatalogLangOptions();
     const q = $("catalog-search").value.trim().toLowerCase();
+    const lang = $("catalog-lang").value;
     const rows = state.catalog
       .filter(function (d) {
+        if (lang && d.language !== lang) {
+          return false;
+        }
         if (!q) {
           return true;
         }
@@ -218,6 +258,11 @@
 
   let searchTimer = 0;
   $("catalog-search").addEventListener("input", function () {
+    window.clearTimeout(searchTimer);
+    searchTimer = window.setTimeout(renderCatalog, 250);
+  });
+
+  $("catalog-lang").addEventListener("change", function () {
     window.clearTimeout(searchTimer);
     searchTimer = window.setTimeout(renderCatalog, 250);
   });

@@ -19,7 +19,7 @@
       tip: "Hier loggen Sie sich ein (Kundennummer + Passwort Ihres Normen-Abonnements). Danach lädt der Katalog automatisch. Norm wählen, «Downloaden» — sie erscheint in «Meine Normen».",
       sections: [
         ["Login", "Provider wählen (z. B. SIA), Kundennummer/Benutzername und Passwort eingeben. Die Device-ID wird automatisch präbefüllt und kann so bleiben. «Zugangsdaten merken» speichert Kundennummer und Passwort im OS-Keyring — nie im Klartext in der App. Nach dem Login lädt der Katalog als Sitzungs-Snapshot (bei SIA rund 6700 Normen)."],
-        ["Katalog durchsuchen", "Suche nach Nummer, Titel oder Stichwort. Jede Zeile zeigt Nummer, Titel, Sprache, Ausgabe und Gültigkeit. Mit «Downloaden» wird die Norm als Hintergrund-Job in «Meine Normen» übernommen."],
+        ["Katalog durchsuchen", "Suche nach Nummer, Titel oder Stichwort; mit dem Sprachfilter (Dropdown) nur eine Sprache anzeigen. Jede Zeile zeigt Nummer, Titel, Sprache, Ausgabe und Gültigkeit. Mit «Downloaden» wird die Norm als Hintergrund-Job in «Meine Normen» übernommen. Hinweis: Normenwerk (z. B. SIA vs. EU) und Fachrichtung sind keine Felder der Katalog-Daten — ein Filter dafür ist nicht möglich."],
         ["Typische Meldungen", "«Zeitüberschreitung» ist ein transienter Zustand des Portals — einfach erneut einloggen. Bei falschem Passwort zeigt die Meldung eine sichere Diagnose (nur Längen und Zeichengruppen, nie das Passwort). Abmelden oder App-Neustart beendet die Sitzung: PDFs sind nur während einer Sitzung verfügbar."],
       ],
     },
