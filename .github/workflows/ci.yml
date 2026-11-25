@@ -70,30 +70,33 @@ jobs:
             echo "::error::P0a: Gtk.init_check rc=$rc (kalte Init >60 s oder Hang)"
             exit "$rc"
           fi
-      - name: "P0b-Probe: Gtk.init_check mit NO_AT_BRIDGE=1 (A11y-Brücke skippt)"
-        if: runner.os == 'Linux'
-        shell: bash
-        env:
-          NO_AT_BRIDGE: "1"
-        run: |
-          # Variante ohne ATK-Brücke: isoliert, ob der A11y-Bus-Check
-          # (ServiceUnknown auf dem GHA-Runner) der Blockpunkt ist.
-          set +e
-          timeout 60 xvfb-run --auto-servernum python3 -c "import time,gi; gi.require_version('Gtk','3.0'); from gi.repository import Gtk; t0=time.monotonic(); Gtk.init_check([]); print('P0b: Gtk.init_check (NO_AT_BRIDGE=1) ok nach %.1f s' % (time.monotonic()-t0))"
-          rc=$?
-          set -e
-          if [ "$rc" -ne 0 ]; then
-            echo "::error::P0b: Gtk.init_check mit NO_AT_BRIDGE rc=$rc (A11y ist nicht der Blockpunkt)"
-            exit "$rc"
-          fi
+      # Root Cause (längst 25-s-GAP im GApplication-Startup unter GHA,
+      # bezeugt durch P0a/P1/P1b + Quellcode-Trace, Run 45516863516):
+      # GTK-3.24 gtk_application_impl_dbus_startup() holt bei
+      # "Session-Bus vorhanden, kein GNOME/Xfce-Session-Manager" den
+      # Inhibit-Portal-Proxy MIT Auto-Start (G_DBUS_PROXY_FLAGS_NONE).
+      # GLib-2.80 sendet dafür einen sync. StartServiceByName-Call für
+      # org.freedesktop.portal.Desktop mit 25-s-Default-Timeout —
+      # xdg-desktop-portal kann unter headless CI den Namen nie
+      # registrieren → Timeout → GTK schluckt den Error (g_debug) und
+      # fährt fort. Fix hier: XDG_RUNTIME_DIR="" → g_bus_get_sync
+      # findet keinen Session-Bus mehr → GTK überspringt den ganzen
+      # Session-Manager/Portal-Pfad (if (!session) goto out).
+      # Production-Linux ist davon nicht betroffen (dort existiert
+      # Session-Manager oder laufender Portal).
       - name: "P1-Probe: Gtk.Application activate unter Xvfb (ohne pywebview)"
         if: runner.os == 'Linux'
         shell: bash
+        env:
+          # Siehe Root-Cause-Kommentar oben: ohne Session-Bus-Discovery
+          # dauert der GApplication-Startup ~0 s statt 25 s.
+          XDG_RUNTIME_DIR: ""
+          NO_AT_BRIDGE: "1"
         run: |
-          # Binary-Such: feuert ``activate`` bei einem plainen Gtk.Application
-          # (exakt pywebview-Form, ohne Abstraktion)? Isoliert GHA-Umgebung
-          # vs. pywebview-Code vs. PyInstaller-Bundle. Watchdog 45 s +
-          # Heartbeat trennen "langsame Init" von echtem Hang.
+          # Regressions-Guard für den GApplication-Startup-Pfad
+          # (exakt pywebview-Form: Gtk.Application.new(None, 0) +
+          # activate). Erwartung: activate feuert in <5 s. Watchdog
+          # 45 s + Heartbeat erkennen einen echten Hang trotzdem.
           python3 -c "import gi; print('[P1] gi-Import OK')"
           set +e
           timeout 90 xvfb-run --auto-servernum python3 packaging/ci_gtk_probe.py
@@ -109,34 +112,17 @@ jobs:
             echo "::error::P1: Probe rc=$rc (Details oben im Log)"
             exit "$rc"
           fi
-      - name: "P1b-Probe: Gtk.Application mit G_MESSAGES_DEBUG=all (D-Bus-Verkehr)"
-        if: runner.os == 'Linux'
-        shell: bash
-        env:
-          # GLib/GDBus-Debug: zeigt jede D-Bus-Message (gesendet/empfangen).
-          # Ziel: identifizieren, welcher Call ~25 s (D-Bus-Default-Timeout)
-          # vor "ACTIVATE FIRED" ohne Antwort wartet (Run 45516051085:
-          # P0=0.0 s, P1-activate=25.0 s — Block liegt im GApplication-Pfad).
-          G_MESSAGES_DEBUG: "all"
-        run: |
-          # Gleiche Probe wie P1, nur mit Debug-Log. rc wie P1 (0 = fired).
-          set +e
-          timeout 90 xvfb-run --auto-servernum python3 packaging/ci_gtk_probe.py
-          rc=$?
-          set -e
-          if [ "$rc" -ne 0 ]; then
-            echo "::error::P1b: Probe rc=$rc (Details oben im Log)"
-            exit "$rc"
-          fi
-          echo "P1b OK: Debug-Log im Job-Log (D-Bus-Verkehr um die 25-s-Lücke)"
       - name: "P2-Probe: Hello Window aus dem Quellbaum (pywebview, ohne PyInstaller)"
         if: runner.os == 'Linux'
         shell: bash
         env:
           SIA_HELLO_WINDOW_SECONDS: "5"
-          # Shown-Wait toleriert langsame (kalte) Init: 5 s + 40 s = 45 s,
-          # konsistent mit P1- watchdog.
-          SIA_HELLO_WINDOW_SHOWN_WAIT: "40"
+          # Shown-Wait: 5 s + 20 s = 25 s Toleranz für kalte Init
+          # (der 25-s-D-Bus-Stall entfällt durch XDG_RUNTIME_DIR="").
+          SIA_HELLO_WINDOW_SHOWN_WAIT: "20"
+          # Siehe Root-Cause-Kommentar beim P1-Step.
+          XDG_RUNTIME_DIR: ""
+          NO_AT_BRIDGE: "1"
           WEBKIT_DISABLE_COMPOSITING_MODE: "1"
         run: |
           # Binary-Such: dieselbe App, exakt derselbe Code — nur ohne
@@ -164,8 +150,13 @@ jobs:
         shell: bash
         env:
           SIA_HELLO_WINDOW_SECONDS: "5"
-          # Shown-Wait toleriert langsame (kalte) Init: 5 s + 40 s = 45 s.
-          SIA_HELLO_WINDOW_SHOWN_WAIT: "40"
+          # Shown-Wait: 5 s + 20 s = 25 s Toleranz für kalte Init.
+          SIA_HELLO_WINDOW_SHOWN_WAIT: "20"
+          # Linux: ohne Session-Bus-Discovery entfällt der 25-s-D-Bus-Stall
+          # im GApplication-Startup (siehe Root-Cause-Kommentar beim
+          # P1-Step). Auf macOS/Windows werden die Variablen ignoriert.
+          XDG_RUNTIME_DIR: ""
+          NO_AT_BRIDGE: "1"
           # WebKit2GTK ohne GPU (Runner): Compositing abschalten, sonst Crashes.
           WEBKIT_DISABLE_COMPOSITING_MODE: "1"
         run: |
