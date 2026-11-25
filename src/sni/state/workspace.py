@@ -158,3 +158,15 @@ def save_workspace_json(state: Mapping[str, object], data_dir: Path | None = Non
             os.remove(tmp_name)
         raise
     del payload
+
+
+def is_onboarding_done(data_dir: Path | None = None) -> bool:
+    """Onboarding-Flag (M8.6): True, wenn „Erste Schritte“ abgeschlossen."""
+    return bool((load_workspace_json(data_dir) or {}).get("onboarding_done"))
+
+
+def mark_onboarding_done(data_dir: Path | None = None) -> None:
+    """Setzt das Onboarding-Flag (übrige Felder bleiben erhalten)."""
+    state = load_workspace_json(data_dir) or {}
+    state["onboarding_done"] = True
+    save_workspace_json(state, data_dir)

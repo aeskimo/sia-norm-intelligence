@@ -516,3 +516,29 @@ select:focus-visible {
   padding: 4px 6px;
   font-size: 13px;
 }
+
+/* --- Onboarding (M8.6, 09 §2) ---------------------------------------------- */
+
+.onboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .onboard-grid { grid-template-columns: 1fr; }
+}
+
+.onboard-card { display: flex; flex-direction: column; }
+
+.onboard-card .chip { align-self: flex-start; margin: 4px 0; }
+
+.onboard-card .btn { align-self: flex-start; margin-top: auto; }
+
+.onboard-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+}

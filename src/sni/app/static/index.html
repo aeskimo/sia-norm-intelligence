@@ -261,6 +261,7 @@
             <p class="muted">Der gibb-API-Key wird nur im OS-Keyring gespeichert und nie angezeigt oder zurückgeliefert.</p>
             <div class="form-actions">
               <button type="submit" class="btn btn-accent" id="settings-save">Speichern</button>
+              <a class="muted" href="#/onboarding">«Erste Schritte» wiederholen</a>
             </div>
             <p id="settings-message" class="muted" aria-live="polite"></p>
           </form>
@@ -274,6 +275,35 @@
               <tr><th>gibb-API-Key</th><td id="set-gibb-key-state">–</td></tr>
             </tbody>
           </table>
+        </div>
+        <div class="status-row" aria-live="polite"><span class="status-dot neutral" aria-hidden="true"></span><span class="status-text">Bereit.</span></div>
+      </section>
+      <section class="view" id="view-onboarding" data-view="onboarding" hidden>
+        <h1>Erste Schritte</h1>
+        <p class="muted">So starten Sie mit dem SIA-Normenassistenten. Alle Schritte sind optional und in den Einstellungen jederzeit wiederholbar.</p>
+        <div class="onboard-grid">
+          <div class="card onboard-card">
+            <h2 class="card-title">1 · SIA-Login</h2>
+            <p class="muted">Zum Normen-Download, für Fragen und den Semantik-Export loggen Sie sich im Normenkatalog ein.</p>
+            <p><span class="chip" id="onboard-shop-chip" aria-live="polite">…</span></p>
+            <a class="btn" href="#/catalog">Zum Normenkatalog</a>
+          </div>
+          <div class="card onboard-card">
+            <h2 class="card-title">2 · Ollama (lokal, optional)</h2>
+            <p class="muted">Für lokale Antworten und Embeddings. Download: ollama.com/download, danach im Terminal «ollama serve» starten.</p>
+            <p><span class="chip" id="onboard-ollama-chip" aria-live="polite">…</span></p>
+            <a class="btn" href="#/models">Zu den lokalen Modellen</a>
+          </div>
+          <div class="card onboard-card">
+            <h2 class="card-title">3 · gibb-API-Key (optional)</h2>
+            <p class="muted">Alternative zu Ollama: OpenAI-kompatible gibb-API. Key und Modell werden in den Einstellungen hinterlegt.</p>
+            <p><span class="chip" id="onboard-gibb-chip" aria-live="polite">…</span></p>
+            <a class="btn" href="#/settings">Zu den Einstellungen</a>
+          </div>
+        </div>
+        <div class="onboard-actions">
+          <button type="button" class="btn btn-accent" id="onboard-finish">Fertig – los geht’s</button>
+          <a class="muted" href="#/settings">Erste Schritte später wiederholen (Einstellungen)</a>
         </div>
         <div class="status-row" aria-live="polite"><span class="status-dot neutral" aria-hidden="true"></span><span class="status-text">Bereit.</span></div>
       </section>

@@ -62,7 +62,9 @@ from sni.state.workspace import (
     DEFAULT_GENERATION_MODEL,
     DEFAULT_GIBB_BASE_URL,
     DEFAULT_PROVIDER,
+    is_onboarding_done,
     load_workspace_json,
+    mark_onboarding_done,
 )
 
 router = APIRouter(tags=["app"])
@@ -79,6 +81,18 @@ class StatusResponse(BaseModel):
     documents: int = 0
     summary: str
     disclaimer: str
+
+
+class OnboardingStatus(BaseModel):
+    """„Erste Schritte“ (M8.6, 09 §2): Kachel-Status für das Onboarding.
+
+    Keine Norm- oder Kundendaten (G4) — nur Bool-Status pro Schritt.
+    """
+
+    done: bool
+    shop_logged_in: bool
+    ollama_available: bool
+    gibb_key_set: bool
 
 
 class LoginRequest(BaseModel):
@@ -459,6 +473,30 @@ def status(request: Request) -> StatusResponse:
         summary=_status_summary(shop),
         disclaimer=DISCLAIMER,
     )
+
+
+@router.get("/onboarding", response_model=OnboardingStatus)
+def onboarding_status(request: Request) -> OnboardingStatus:
+    """M8.6: Onboarding-Status (09 §2): SIA-Login, Ollama (optional), gibb-Key (optional)."""
+    shop = _shop(request)
+    try:
+        ollama_available = OllamaModelManager(OLLAMA_URL).available()
+    except PermissionError:
+        ollama_available = False  # Host-Check im Konstruktor (konfigurierter Remote-Host)
+    return OnboardingStatus(
+        done=is_onboarding_done(shop.data_dir),
+        shop_logged_in=shop.bundle is not None,
+        ollama_available=ollama_available,
+        gibb_key_set=GibbApiKeyStore().load() is not None,
+    )
+
+
+@router.post("/onboarding/complete")
+def onboarding_complete(request: Request) -> dict[str, object]:
+    """M8.6: „Fertig“ — Onboarding-Flag setzen (Überspringen erlaubt)."""
+    shop = _shop(request)
+    mark_onboarding_done(shop.data_dir)
+    return {"done": True}
 
 
 @router.post("/session/login")

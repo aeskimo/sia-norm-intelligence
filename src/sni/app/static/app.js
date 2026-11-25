@@ -44,8 +44,8 @@
     return div.innerHTML;
   }
 
-  /* --- Hash-Router (6 Views, wie die Java-Tabs) -------------------------- */
-  const VIEWS = ["catalog", "norms", "assistant", "intelligence", "models", "settings"];
+  /* --- Hash-Router (6 Views wie die Java-Tabs + Onboarding, M8.6) -------- */
+  const VIEWS = ["catalog", "norms", "assistant", "intelligence", "models", "settings", "onboarding"];
   const DEFAULT_VIEW = "catalog";
 
   function currentView() {
@@ -1507,6 +1507,68 @@
 
   renderIntelProject();
 
+  /* --- Onboarding (M8.6, 09 §2): „Erste Schritte“-View ----------------------- */
+
+  function setOnboardChip(id, ok, okText, notOkText) {
+    const chip = $(id);
+    if (!chip) {
+      return;
+    }
+    chip.textContent = ok ? okText : notOkText;
+    chip.classList.toggle("chip-success", ok);
+  }
+
+  async function refreshOnboarding() {
+    try {
+      const data = await apiJson("/v1/onboarding");
+      setOnboardChip("onboard-shop-chip", !!data.shop_logged_in, "Eingeloggt", "Nicht eingeloggt");
+      setOnboardChip(
+        "onboard-ollama-chip",
+        !!data.ollama_available,
+        "Ollama erreichbar",
+        "Ollama nicht erreichbar"
+      );
+      setOnboardChip(
+        "onboard-gibb-chip",
+        !!data.gibb_key_set,
+        "API-Key hinterlegt",
+        "Kein API-Key"
+      );
+    } catch (err) {
+      /* Fehleranzeige über die Statuszeile (poll) */
+    }
+  }
+
+  $("onboard-finish").addEventListener("click", async function () {
+    const button = $("onboard-finish");
+    button.disabled = true;
+    try {
+      await apiJson("/v1/onboarding/complete", { method: "POST" });
+      window.location.hash = "#/catalog";
+    } catch (err) {
+      button.disabled = false; // Statuszeile zeigt den API-Fehler
+    }
+  });
+
+  let firstRunChecked = false;
+  async function checkFirstRun() {
+    if (firstRunChecked) {
+      return;
+    }
+    firstRunChecked = true;
+    if (window.location.hash) {
+      return; // Deep Link wird respektiert
+    }
+    try {
+      const data = await apiJson("/v1/onboarding");
+      if (!data.done) {
+        window.location.hash = "#/onboarding";
+      }
+    } catch (err) {
+      /* API noch nicht bereit: Default-View bleibt */
+    }
+  }
+
   /* --- Statuszeile + Polling --------------------------------------------------- */
 
   /* --- Statuszeile: semantische Klassifikation ----------------------------
@@ -1562,9 +1624,13 @@
     if (view === "settings" && !settingsLoaded) {
       loadSettings();
     }
+    if (view === "onboarding") {
+      refreshOnboarding();
+    }
   }
 
   window.addEventListener("hashchange", render);
+  checkFirstRun();
   poll();
   setInterval(poll, 2000);
 })();
