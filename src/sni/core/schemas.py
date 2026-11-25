@@ -16,7 +16,22 @@ from jsonschema.exceptions import SchemaError
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 
-SCHEMAS_DIR = Path(__file__).resolve().parents[3] / "schemas"
+
+def _schemas_dir() -> Path:
+    """Schema-Verzeichnis: Dev ``<repo>/schemas``, frozen ``<sys._MEIPASS>/schemas``.
+
+    Im PyInstaller-Bündel zeigt ``__file__`` ins Bundle, und ``parents[3]``
+    würde aus dem Bundle herausweisen — die Schemas werden deshalb mit
+    ``--add-data schemas:schemas`` gebündelt (``make package``); ``sys``
+    ist bereits importiert.
+    """
+    meipass = getattr(sys, "_MEIPASS", None)
+    if isinstance(meipass, str):
+        return Path(meipass) / "schemas"
+    return Path(__file__).resolve().parents[3] / "schemas"
+
+
+SCHEMAS_DIR = _schemas_dir()
 DRAFT_2020_12 = "https://json-schema.org/draft/2020-12/schema"
 
 

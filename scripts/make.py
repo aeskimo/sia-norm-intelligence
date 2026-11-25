@@ -1,5 +1,5 @@
-"""Plattformuebergreifendes Make-Aequivalent: setup | check | eval | run | ingest | extract
-(REQ-000/REQ-200/REQ-900).
+"""Plattformuebergreifendes Make-Aequivalent: setup | check | eval | run | ingest |
+extract | snapshot | package (REQ-000/REQ-200/REQ-900; package: M8.6, REQ-813).
 
 Wird aufgerufen von:
 - Makefile (Linux/macOS/CI)
@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 VENV_DIR = ROOT / ".venv"
 MIN_VERSION = (3, 12)
 PREFERRED_VERSIONS = ("3.12", "3.13", "3.14")
-TARGETS = ("setup", "check", "eval", "run", "ingest", "extract", "snapshot")
+TARGETS = ("setup", "check", "eval", "run", "ingest", "extract", "snapshot", "package")
 PROBE_VERSION = "import sys; raise SystemExit(0 if sys.version_info >= {min_version} else 1)"
 PROBE_EXECUTABLE = "import sys; print(sys.executable)"
 
@@ -144,11 +144,75 @@ def cmd_run() -> int:
     ).returncode
 
 
+APP_NAME = "SIA-Normenassistent"
+
+
+def _package_args() -> list[str]:
+    """PyInstaller-Argumente für die frozen App (M8.6, REQ-813), je nach OS.
+
+    macOS: onedir ``.app``; Windows: onefile ``.exe``; Linux: onedir
+    (AppImage in der CI, REQ-813). Gebündelt: Static-UI (``STATIC_DIR``),
+    JSON-Schemas (``SCHEMAS_DIR``, frozen-aware) und Pilot-Snapshots (Seed,
+    ``bootstrap.bundle_data_dir``). ``ifcopenshell`` komplett (eigene
+    Dylib-Bundles, kein Hook in hooks-contrib), ``keyring``-Metadata
+    (Backend-Discovery per Entry-Points), Linux: ``gi`` (pywebview-GTK).
+    """
+    sep = ";" if os.name == "nt" else ":"
+    args = [
+        "-m",
+        "PyInstaller",
+        "--noconfirm",
+        "--clean",
+        "--name",
+        APP_NAME,
+        "--windowed",
+        "--paths",
+        "src",
+    ]
+    for source, dest in (
+        ("src/sni/app/static", "sni/app/static"),
+        ("schemas", "schemas"),
+        ("data/catalog/snapshots", "sni_data/catalog/snapshots"),
+    ):
+        args += ["--add-data", f"{source}{sep}{dest}"]
+    args += [
+        "--collect-all",
+        "ifcopenshell",
+        "--collect-all",
+        "webview",
+        "--copy-metadata",
+        "keyring",
+    ]
+    if os.name == "nt":
+        args += ["--onefile", "--icon", "packaging/icon/app-icon.ico"]
+    elif sys.platform == "darwin":
+        args += ["--icon", "packaging/icon/app-icon.icns"]
+    else:
+        args += ["--collect-all", "gi"]
+    args.append("packaging/app_entry.py")
+    return args
+
+
+def cmd_package() -> int:
+    """M8.6 (REQ-813): frozen App bauen (PyInstaller) → ``dist/``."""
+    py = str(ensure_venv())
+    _run([py, *_package_args()])
+    if os.name == "nt":
+        artifact = f"{APP_NAME}.exe"
+    elif sys.platform == "darwin":
+        artifact = f"{APP_NAME}.app"
+    else:
+        artifact = APP_NAME
+    print(f"[package] fertig: dist/{artifact}")
+    return 0
+
+
 HANDLERS: dict[str, Callable[[], int]] = {
     "setup": cmd_setup,
     "check": cmd_check,
     "eval": cmd_eval,
     "run": cmd_run,
+    "package": cmd_package,
 }
 
 

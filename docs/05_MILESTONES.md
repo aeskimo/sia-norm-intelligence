@@ -61,7 +61,7 @@ Jeder Milestone ist erst fertig, wenn alle Kriterien als Test existieren und gr�
 - REQ-814: Design-Baseline: SIA-Design-Tokens (CSS), WCAG 2.1 AA (Kontrast ≥ 4.5:1, Mindest-Font 12 px), Dark Mode via `prefers-color-scheme`, Fenster-Fit 1200×800
 - REQ-815: Migration des Java-Stands beim ersten Start: `workspace.state` (SIASST1) → `workspace.json`, `*.siaidx` (SIAIDX01) → `.sniidx` (Byte-kompatibler Importer); Keychain-Einträge: macOS lesbar unter gleichem Service/Account (Test), Windows/Linux ohne Java-Einträge (dokumentierte Abwesenheit)
 - REQ-816: App-API-Sicherheit (nur `app_mode`): zufälliger freier Port pro Start (Fenster-/Browser-Modus), Session-Token (Launcher → UI, Pflicht auf `/v1/*`), `Host`-Header muss loopback sein, nicht-same-origin `Origin` wird abgelehnt (Schutz gegen CSRF/DNS-Rebinding, G4)
-- REQ-817: Packaging-Smoke in M8.1: minimale App (Hello Window) wird in der CI auf ubuntu/macos/windows gebaut und gestartet (PyInstaller + pywebview; WebView2/WebKitGTK); echte Installer inkl. Code-Signing/Notarization (OQ-014) in M8.6
+- REQ-817: Packaging-Smoke in M8.1: minimale App (Hello Window) wird in der CI auf ubuntu/macos/windows gebaut und gestartet (PyInstaller + pywebview; WebView2/WebKitGTK); echte (unsigned) Installer in M8.6 (Code-Signing/Notarization ausgelagert: OQ-014, TODO)
 
 ## M9 – Echte Normdokumente: PDF-Extraktion (OQ-003, ADR-0010)
 - REQ-900: Given ein PDF unter `data/norms/<norm-id>/document.pdf` When `make extract NORM=<norm-id>` Then entsteht `document.draft.json` mit Ziffern-Skelett (Ziffernnummern am Zeilenanfang, deterministisch) und extrahiertem Ziffern-Text; Fachfelder bleiben leer; der Entwurf ist validiert gegen `document_draft.schema.json`

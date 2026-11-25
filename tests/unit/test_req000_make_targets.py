@@ -10,7 +10,7 @@ MAKE_SCRIPT = ROOT / "scripts" / "make.py"
 
 def test_req000_makefile_contains_all_targets() -> None:
     text = (ROOT / "Makefile").read_text(encoding="utf-8")
-    for target in ("setup", "check", "eval", "run", "ingest", "extract"):
+    for target in ("setup", "check", "eval", "run", "ingest", "extract", "snapshot", "package"):
         assert f"{target}:" in text, f"Target {target} fehlt in der Makefile"
 
 

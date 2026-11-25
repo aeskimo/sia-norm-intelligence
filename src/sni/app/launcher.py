@@ -18,6 +18,7 @@ import sys
 import threading
 import webbrowser
 from pathlib import Path
+from typing import Any
 
 import uvicorn
 
@@ -83,6 +84,42 @@ def run_browser(args: argparse.Namespace, core_data_dir: Path | None = None) -> 
     return 0
 
 
+def _auto_close(window: Any, shown_wait: float, destroy_backstop: float = 15.0) -> None:
+    """CI-Auto-Schliessen (REQ-813): Shown-Event abwarten, destroy + Backstop.
+
+    Das Shown-Event kann unter CI langsam kommen (kalte Init, Xvfb); deshalb
+    Polling bis ``shown_wait`` statt einmaliges Warten. Ohne Shown-Event wirft
+    ``window.destroy()`` im Neben-Thread stillschweigend und die App läuft
+    ewig weiter (CI-Hang) — daher ``os._exit`` mit 1 (Pattern:
+    ``packaging/hello_window.py``).
+    """
+    import time
+
+    def _backstop() -> None:
+        print("[window] destroy lief nicht aus → Backstop os._exit(0)", file=sys.stderr)
+        os._exit(0)
+
+    deadline = time.monotonic() + shown_wait
+    shown = False
+    while time.monotonic() < deadline:
+        if window.events.shown.wait(1):
+            shown = True
+            break
+    if shown:
+        print("[window] Fenster angezeigt → window.destroy()", file=sys.stderr)
+        backstop = threading.Timer(destroy_backstop, _backstop)
+        backstop.daemon = True
+        backstop.start()
+        window.destroy()
+    else:
+        print(
+            "[window] Fenster wurde nicht angezeigt → os._exit(1)",
+            file=sys.stderr,
+            flush=True,
+        )
+        os._exit(1)
+
+
 def run_window(args: argparse.Namespace, core_data_dir: Path | None = None) -> int:
     """Fenster-Modus: pywebview im Main-Thread (macOS), Server im Hintergrund-Thread."""
     port = pick_free_port()
@@ -96,7 +133,15 @@ def run_window(args: argparse.Namespace, core_data_dir: Path | None = None) -> i
         raise SystemExit(
             "pywebview ist nicht installiert (Fenster-Modus). Benutze --browser oder --headless."
         ) from exc
-    webview.create_window("SIA-Normenassistent", ui_url(port, token), width=1200, height=800)
+    window = webview.create_window(
+        "SIA-Normenassistent", ui_url(port, token), width=1200, height=800
+    )
+    seconds = float(os.environ.get("SIA_WINDOW_SECONDS", "0") or 0)
+    if seconds > 0:
+        # CI-Smoke (REQ-813): nach `seconds` Shown-Event abwarten, destroy +
+        # Backstop (Pattern: packaging/hello_window.py).
+        shown_wait = float(os.environ.get("SIA_WINDOW_SHOWN_WAIT", "20"))
+        threading.Timer(seconds, _auto_close, args=(window, shown_wait)).start()
     webview.start()
     server.should_exit = True
     return 0

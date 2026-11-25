@@ -431,7 +431,7 @@ cryptography 50.0.2 ohne Warnungen (`test_req801_des_kat.py`).
 | Fenster | WKWebView (pywebview) | WebView2 (in Win11 enthalten) | WebKit2GTK (Paket-Hinweis in Doku) |
 | Keyring | Keychain | Credential Manager | Secret Service/KWallet (Fallback File) |
 | Daten | `~/.sia-normenassistent` | dito (`%USERPROFILE%`) | dito |
-| Installer | PyInstaller `.app` (Code-Signing/Notarization: OQ-014) | PyInstaller EXE (+NSIS-Option) | PyInstaller AppImage |
+| Installer | PyInstaller `.app` (onedir, unsigned) | PyInstaller onefile EXE (unsigned; NSIS = Option) | PyInstaller onedir + AppImage (unsigned) |
 | Ollama | separat installiert (Onboarding-Link) | dito | dito |
 
 **CI** (`.github/workflows/ci.yml`): Matrix `ubuntu-latest`,
@@ -439,8 +439,20 @@ cryptography 50.0.2 ohne Warnungen (`test_req801_des_kat.py`).
 alle mit `make check`. Zusätzlich ab **M8.1** der Packaging-Smoke-Test
 (REQ-817): minimale App (Hello Window) wird auf jedem Matrix-OS gebaut
 und gestartet — das Packaging-Risiko (PyInstaller + pywebview,
-WebView2/WebKitGTK, Signing) fällt so in Woche 1 auf, nicht nach
+WebView2/WebKitGTK) fällt so in Woche 1 auf, nicht nach
 fünf Feature-Steps.
+
+**Unsigned-Installer (M8.6, OQ-014 ausgelagert):** Ab M8.6 baut die CI
+die echten Installer (`.app` / onefile-EXE / AppImage) auf allen drei
+OS, aber **ohne Code-Signing und Notarization** (User-Entscheid
+25.11.2026: Signing komplett auslagern, OQ-014 bleibt offen/TODO).
+Folgen für die Erstnutzung:
+
+- **macOS:** Gatekeeper meldet «unverifizierter Entwickler» →
+  Rechtsklick auf die App → «Öffnen», einmalig bestätigen.
+- **Windows:** SmartScreen zeigt «unbekannter Herausgeber» →
+  «Weitere Informationen» → «Trotzdem ausführen».
+- **Linux:** AppImage zusätzlich `chmod +x` (Standard, signing-unabhängig).
 
 ## 12. Teststrategie
 
@@ -484,7 +496,7 @@ fünf Feature-Steps.
 | M8.3 | Analyse-Pipeline (Extraktions-Gate pypdfium2 vs. pdfminer.six, Indexe, RRF), RAG-QA + Streaming, Migration-Import + Keyring-3-OS-Test | 802, 804, 805, 815 |
 | M8.4 | Ollama-Manager, gibb-Provider, Einstellungen/Arbeitssets | 806, 807, 808 |
 | M8.5 | SNI-Kern in der App: Review-Queue (G3), Semantik-Export, Projektdaten-UI, Intelligence-UI | 809–812 |
-| M8.6 | Cross-Platform-CI (3 OS), echte Installer (PyInstaller: EXE / .app + Signing + Notarization / AppImage), Onboarding — Packaging-Grundrisiko bereits in M8.1 verifiziert (Signing: OQ-014) | 813 |
+| M8.6 | Cross-Platform-CI (3 OS), echte Installer (PyInstaller: EXE / .app / AppImage, **unsigned** — Signing/Notarization ausgelagert: OQ-014), Onboarding — Packaging-Grundrisiko bereits in M8.1 verifiziert | 813 |
 
 **DoD pro Step:** alle REQ als Test grün, `make check` auf 3 OS,
 PROGRESS.md aktualisiert, ADRs akzeptiert, Screenshots/UI-Checks wie
@@ -520,7 +532,9 @@ im Java-Projekt (Screenshot + nicht-blank).
   ADR-0009 (Datenlayout/Credentials) — alle akzeptiert 24.11.2026
   per User-Entscheid
 - OQ-009…OQ-013 (beantwortet, User-Entscheide 24.11.2026) ·
-  OQ-014 (Code-Signing/Notarization) ·
+  OQ-014 (Code-Signing/Notarization: **ausgelagert**, User-Entscheid
+  25.11.2026 — M8.6 baut unsigned Installer, Signing = TODO;
+  Gatekeeper/SmartScreen-Hinweise in §11) ·
   OQ-015 (beantwortet, User-Entscheid 25.11.2026: M8.3 mit
   `sia101-2020` + Fixtures, 8 textlose Normen als blockiert/ERROR)
 - 03_ARCHITECTURE.md (Schichten) · 04_DATA_MODEL.md (Lebenszyklen) ·
