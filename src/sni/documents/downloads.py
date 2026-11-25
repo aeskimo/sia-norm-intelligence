@@ -21,6 +21,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import StrEnum
 
+from sni.documents.analysis import DocumentAnalysisPipeline
 from sni.documents.pdfcache import SessionDocumentCache
 from sni.documents.registry import LocalDocumentRegistry
 from sni.shop.catalog_xml import StandardDocument
@@ -73,10 +74,12 @@ class DownloadService:
         registry: LocalDocumentRegistry,
         *,
         job_id_factory: Callable[[], str] | None = None,
+        pipeline: DocumentAnalysisPipeline | None = None,
     ) -> None:
         self._service = product_service
         self._cache = cache
         self._registry = registry
+        self._pipeline = pipeline
         self._job_id_factory: Callable[[], str] = job_id_factory or (lambda: uuid.uuid4().hex)
         self._jobs: dict[str, Job] = {}
         self._lock = threading.RLock()
@@ -91,6 +94,18 @@ class DownloadService:
         with self._lock:
             self._jobs[job.id] = job
         self._executor.submit(self._run, job.id, session, product_id)
+        return job
+
+    def submit_analyze(self, product_id: str, embedding_model: str = "") -> Job:
+        """Reicht einen Analyse-Job ein (REQ-804): Extraktion → Volltext → Vektoren.
+
+        Gleiche Queue wie Downloads (09 §6.2: max. 1 paralleler Job);
+        ``embedding_model`` leer → nur Volltextindex.
+        """
+        job = Job(id=self._job_id_factory(), kind=JobKind.ANALYZE, document_id=product_id)
+        with self._lock:
+            self._jobs[job.id] = job
+        self._executor.submit(self._run_analyze, job.id, product_id, embedding_model)
         return job
 
     def get(self, job_id: str) -> Job | None:
@@ -132,6 +147,46 @@ class DownloadService:
             self._update(job_id, status=JobStatus.DONE, progress="PDF im Sitzungscache")
         except Exception as exc:  # noqa: BLE001 — Java: catch (Exception ex)
             self._fail(job_id, document, f"{type(exc).__name__}: {exc}")
+
+    def _run_analyze(self, job_id: str, product_id: str, embedding_model: str) -> None:
+        """Analyse-Job (REQ-804): Session-PDF → Pipeline → Registry-Status.
+
+        Fehler (z. B. textloses PDF, OQ-015) landen als ``ERROR`` mit
+        Detail in der Registry — UI-sichtbar (Fehlermeldung nie mit
+        Schlüsselmaterial, G4).
+        """
+        pipeline = self._pipeline
+        if pipeline is None:
+            self._fail(job_id, None, "Analyse-Pipeline ist nicht angeschlossen")
+            return
+        document = self._service.catalog.by_id(product_id)
+        self._update(job_id, status=JobStatus.RUNNING, progress="Dokument wird analysiert …")
+        try:
+            pdf = self._cache.get(product_id)
+            if pdf is None:
+                self._fail(job_id, document, "PDF nicht im Sitzungscache")
+                return
+            if document is None:
+                self._fail(job_id, None, "Dokument unbekannt im Katalog")
+                return
+            self._registry.indexing(document)
+            try:
+                result = pipeline.index(
+                    document,
+                    pdf,
+                    embedding_model,
+                    progress=lambda message: self._update(job_id, progress=message),
+                )
+            finally:
+                # Bytes verbleiben im verschlüsselten Session-Cache (G4).
+                del pdf
+            self._registry.indexed(document, result.pages, result.embeddings_ready, result.message)
+            self._update(job_id, status=JobStatus.DONE, progress=result.message)
+        except Exception as exc:  # noqa: BLE001 — Java: catch (Exception ex)
+            detail = f"{type(exc).__name__}: {exc}"
+            if document is not None:
+                self._registry.error(document, detail)
+            self._update(job_id, status=JobStatus.ERROR, error=detail)
 
     def _fail(self, job_id: str, document: StandardDocument | None, message: str | None) -> None:
         """Job und Registry im Fehlerzustand (Fehlermeldung nie mit Schlüsselmaterial, G4)."""

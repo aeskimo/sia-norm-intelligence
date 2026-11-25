@@ -15,7 +15,9 @@ from __future__ import annotations
 import contextlib
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
+from sni.documents.analysis import DocumentAnalysisPipeline
 from sni.documents.downloads import DownloadService
 from sni.documents.pdfcache import SessionDocumentCache
 from sni.documents.registry import LocalDocumentRegistry
@@ -24,6 +26,9 @@ from sni.shop.catalog import CatalogStore
 from sni.shop.providers import PHGR, SIA, SWKI, VSS, ProviderProfile
 from sni.shop.service import LicenseSession, LoginOutcome, SessionCredentials, SiaProductService
 from sni.shop.soap import SiaSoapClient
+from sni.state.index_cache import EncryptedIndexCache
+from sni.state.keys import ChainedStateKeyProvider, default_state_keys
+from sni.state.paths import index_dir
 
 #: App-Provider (09 §6.2: ``{provider, ...}`` — kurze, klein geschriebene Keys).
 PROVIDERS: dict[str, ProviderProfile] = {
@@ -64,6 +69,7 @@ class ShopBundle:
     session: LicenseSession
     cache: SessionDocumentCache
     registry: LocalDocumentRegistry
+    pipeline: DocumentAnalysisPipeline
     downloads: DownloadService
 
 
@@ -74,9 +80,13 @@ class ShopState:
         self,
         client_factory: Callable[[ProviderProfile], SiaSoapClient] | None = None,
         login_store: SialLoginStore | None = None,
+        data_dir: Path | None = None,
+        state_keys: ChainedStateKeyProvider | None = None,
     ) -> None:
         self._client_factory = client_factory or _production_client
         self._login_store = login_store if login_store is not None else SialLoginStore()
+        self._data_dir = data_dir
+        self._state_keys = state_keys if state_keys is not None else default_state_keys()
         self._bundle: ShopBundle | None = None
 
     # ------------------------------------------------------------------ Zugriff
@@ -117,13 +127,20 @@ class ShopState:
         session = outcome.session
         cache = SessionDocumentCache()
         registry = LocalDocumentRegistry()
+        pipeline = DocumentAnalysisPipeline()
+        index_cache = EncryptedIndexCache(
+            (self._data_dir / "index") if self._data_dir is not None else index_dir(),
+            self._state_keys,
+        )
+        pipeline.attach_index_cache(index_cache)
         bundle = ShopBundle(
             provider=profile,
             product_service=service,
             session=session,
             cache=cache,
             registry=registry,
-            downloads=DownloadService(service, cache, registry),
+            pipeline=pipeline,
+            downloads=DownloadService(service, cache, registry, pipeline=pipeline),
         )
         self._bundle = bundle
         return bundle, outcome

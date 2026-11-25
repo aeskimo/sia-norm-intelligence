@@ -107,6 +107,12 @@ class DownloadRequest(BaseModel):
     product_id: str
 
 
+class AnalyzeRequest(BaseModel):
+    """Analyse-Anfrage (09 §6.2); ``embedding_model`` leer → nur Volltext."""
+
+    embedding_model: str = ""
+
+
 # ------------------------------------------------------------------ Helfer
 
 
@@ -324,6 +330,40 @@ def document_pdf(document_id: str, request: Request) -> Response:
         headers={
             "Content-Disposition": f'attachment; filename="{_pdf_filename(bundle, document_id)}"'
         },
+    )
+
+
+@router.get("/documents/{document_id}")
+def document_detail(document_id: str, request: Request) -> JSONResponse:
+    """09 §6.2: Detail inkl. Job-State (alle Jobs mit dieser ``document_id``)."""
+    bundle = _require_bundle(request)
+    if isinstance(bundle, JSONResponse):
+        return bundle
+    state = bundle.registry.get(document_id)
+    if state is None:
+        return _error(404, "Dokument nicht in der lokalen Registry")
+    detail = _local_document(state)
+    detail["jobs"] = [
+        _job(job) for job in bundle.downloads.jobs() if job.document_id == document_id
+    ]
+    return JSONResponse(detail)
+
+
+@router.post("/documents/{document_id}/analyze")
+def document_analyze(
+    document_id: str, request: Request, payload: AnalyzeRequest | None = None
+) -> JSONResponse:
+    """09 §6.2: async Analyse-Job (Extraktion → Volltext- → Vektorindex)."""
+    bundle = _require_bundle(request)
+    if isinstance(bundle, JSONResponse):
+        return bundle
+    if bundle.registry.get(document_id) is None:
+        return _error(404, "Dokument nicht in der lokalen Registry")
+    model = payload.embedding_model.strip() if payload is not None else ""
+    job = bundle.downloads.submit_analyze(document_id, model)
+    return JSONResponse(
+        {"status": "accepted", "job": _job(job), "disclaimer": DISCLAIMER},
+        status_code=202,
     )
 
 
