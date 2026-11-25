@@ -63,13 +63,7 @@ jobs:
           # Binary-Such: wie lange dauert eine reine GTK-Init (ohne
           # GApplication/WebKit)? Mass für "langsame kalte Init" vs. Hang.
           set +e
-          timeout 60 xvfb-run --auto-servernum python3 -c "import time,gi
-t0=time.monotonic()
-gi.require_version('Gtk','3.0')
-from gi.repository import Gtk
-Gtk.init_check([])
-print('P0a: Gtk.init_check ok nach %.1f s' % (time.monotonic()-t0))
-"
+          timeout 60 xvfb-run --auto-servernum python3 -c "import time,gi; gi.require_version('Gtk','3.0'); from gi.repository import Gtk; t0=time.monotonic(); Gtk.init_check([]); print('P0a: Gtk.init_check ok nach %.1f s' % (time.monotonic()-t0))"
           rc=$?
           set -e
           if [ "$rc" -ne 0 ]; then
@@ -85,13 +79,7 @@ print('P0a: Gtk.init_check ok nach %.1f s' % (time.monotonic()-t0))
           # Variante ohne ATK-Brücke: isoliert, ob der A11y-Bus-Check
           # (ServiceUnknown auf dem GHA-Runner) der Blockpunkt ist.
           set +e
-          timeout 60 xvfb-run --auto-servernum python3 -c "import time,gi
-t0=time.monotonic()
-gi.require_version('Gtk','3.0')
-from gi.repository import Gtk
-Gtk.init_check([])
-print('P0b: Gtk.init_check (NO_AT_BRIDGE=1) ok nach %.1f s' % (time.monotonic()-t0))
-"
+          timeout 60 xvfb-run --auto-servernum python3 -c "import time,gi; gi.require_version('Gtk','3.0'); from gi.repository import Gtk; t0=time.monotonic(); Gtk.init_check([]); print('P0b: Gtk.init_check (NO_AT_BRIDGE=1) ok nach %.1f s' % (time.monotonic()-t0))"
           rc=$?
           set -e
           if [ "$rc" -ne 0 ]; then
