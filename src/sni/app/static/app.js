@@ -625,6 +625,66 @@
     asking: false
   };
 
+  /* Antwortmodell-Dropdown (global in den Einstellungen gespeichert):
+     wird nur neu geladen, wenn die View betreten wird (hashchange-Flag),
+     nicht bei jedem 2-s-Poll. */
+  let askModelDirty = true;
+
+  async function refreshAskModelSelect() {
+    const select = $("ask-model");
+    if (!select) {
+      return;
+    }
+    try {
+      const settings = await apiJson("/v1/settings");
+      const provider = settings.provider || "ollama";
+      let models = [];
+      let current = "";
+      if (provider === "gibb") {
+        const data = await apiJson("/v1/models/gibb");
+        models = data.models || [];
+        current = settings.gibb_model || "";
+      } else {
+        const data = await apiJson("/v1/models/ollama");
+        models = (data.models || []).map(function (m) {
+          return m.name;
+        });
+        current = settings.generation_model || "";
+      }
+      if (current && models.indexOf(current) < 0) {
+        models = [current].concat(models);
+      }
+      select.dataset.provider = provider;
+      select.disabled = models.length === 0;
+      select.innerHTML = models.length
+        ? models
+            .map(function (m) {
+              return '<option value="' + esc(m) + '">' + esc(m) + "</option>";
+            })
+            .join("")
+        : '<option value="">(kein Modell verfügbar)</option>';
+      select.value = current || "";
+    } catch (err) {
+      select.disabled = true;
+      select.innerHTML =
+        '<option value="">(Modellliste nicht verfügbar)</option>';
+    }
+  }
+
+  $("ask-model").addEventListener("change", async function () {
+    const provider = this.dataset.provider || "ollama";
+    const field = provider === "gibb" ? "gibb_model" : "generation_model";
+    try {
+      await apiJson("/v1/settings", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ [field]: this.value })
+      });
+    } catch (err) {
+      setStatus($("view-assistant"), "error", err.message);
+    }
+  });
+
   function isRagReady(doc) {
     return doc.status === "FULLTEXT_READY" || doc.status === "HYBRID_READY";
   }
@@ -696,6 +756,10 @@
   }
 
   async function refreshAssistant() {
+    if (askModelDirty) {
+      askModelDirty = false;
+      refreshAskModelSelect();
+    }
     if (!state.loggedIn) {
       $("assistant-docs-hint").hidden = false;
       $("assistant-docs-hint").textContent =
@@ -1665,7 +1729,10 @@
     deviceField.value = "SIA-APP-" + crypto.randomUUID();
   }
 
-  window.addEventListener("hashchange", render);
+  window.addEventListener("hashchange", function () {
+    askModelDirty = true; // Antwortmodell-Dropdown bei View-Wechsel neu laden
+    render();
+  });
   checkFirstRun();
   poll();
   setInterval(poll, 2000);

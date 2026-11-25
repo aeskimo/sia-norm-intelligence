@@ -36,7 +36,7 @@
       title: "Hilfe: Normenassistent",
       tip: "Fragen an Ihre lokal analysierten Normen — die Antwort nennt die Fundstellen (Norm, Seite). Voraussetzungen: Normen herunterladen, analysieren lassen und hier als Scope markieren.",
       sections: [
-        ["So läuft eine Frage", "1) Normen in «Meine Normen» herunterladen und analysieren. 2) Hier die Dokumente als Scope markieren — oder ein Arbeitsset als Scope wählen. 3) Frage stellen: Die Antwort wird gestreamt und verweist auf Fundstellen. Das Antwortmodell (lokal oder gibb) kommt aus den Einstellungen."],
+        ["So läuft eine Frage", "1) Normen in «Meine Normen» herunterladen und analysieren. 2) Hier die Dokumente als Scope markieren — oder ein Arbeitsset als Scope wählen. 3) Frage stellen: Die Antwort wird gestreamt und verweist auf Fundstellen. Das Antwortmodell (lokal oder gibb) wählen Sie im Dropdown in der Frage-Karte; die Auswahl wird in den Einstellungen gespeichert."],
         ["Arbeitssets", "Gruppieren Sie Normen für wiederkehrende Projekte (z. B. «Bauvorhaben X»). Ein Arbeitsset lässt sich als Scope für Fragen festlegen — so bleibt die Dokument-Auswahl zwischen Sitzungen stabil."],
         ["Grenzen", "Die Antwort ist eine technische Unterstützung mit Quellenangabe — keine Rechtsauskunft. Thinking-Modelle (z. B. qwen3) «denken» zuerst: Die sichtbare Antwort erscheint deshalb erst nach einigen Sekunden bis Minuten."],
       ],

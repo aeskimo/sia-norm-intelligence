@@ -134,7 +134,7 @@ Dev-Extras: `playwright` (UI-Tests), `pyinstaller` (Build).
 |---|---|---|
 | `/catalog` | Tab 1 Normenkatalog | Login-Card (Provider SIA/VSS/PHGR/SWKI, Kunde, Passwort, Device-ID, "Merken"), Katalog-Tabelle (Norm/Titel/Jahr/Sprache/Gültig bis), Statusfilter, Statuszeile |
 | `/norms` | Tab 2 Meine Normen | Lokale Dokumente mit Status + Aktionen (Öffnen [pdf.js-Modal], Analysieren, Entfernen), Cache-Zusammenfassung |
-| `/assistant` | Tab 3 Normenassistent | Links: Doku-Liste + Arbeitsset-Verwaltung; rechts: Fragefeld, Antwort-Fläche (Token-Streaming), Quellenliste mit Zitat-Navigation |
+| `/assistant` | Tab 3 Normenassistent | Links: Doku-Liste + Arbeitsset-Verwaltung; rechts: Fragefeld mit **Antwortmodell-Dropdown** (schreibt in die Einstellungen: `generation_model` bzw. `gibb_model` je Provider), Antwort-Fläche (Token-Streaming), Quellenliste mit Zitat-Navigation |
 | `/intelligence` | Tab 4 Norm Intelligence | Normfrage → Antwort (Klasse-Chip, Claims, Fundstellen, Disclaimer); Semantik-Export; Review-Queue (Freigeben/Ablehnen, G3); Projektdaten (Zeilen, CSV/IFC-Upload, Prüfen, BCF/IDS speichern) |
 | `/models` | Tab 5 Lokale Modelle | Ollama-Liste, Pull, Delete, aktives Modell setzen; Ollama-fehlt-Notice mit Installationshinweis (ollama.com; kein Hyperlink — REQ-814 verbietet externe Resources in den UI-Dateien) |
 | `/settings` | Tab 6 Einstellungen | Fragemodell, Embeddingmodell, Provider (lokal/gibb), gibb-URL/Modell/API-Key (→ Keyring), Freigabename (G3), Datenverzeichnis, Statusschlüssel-Info |

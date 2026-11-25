@@ -102,6 +102,18 @@ def test_req814_norms_view_exposes_analyze() -> None:
     assert 'j.kind === "download" || j.kind === "analyze"' in js
 
 
+def test_req814_assistant_has_model_dropdown() -> None:
+    # Given das Antwortmodell pro Ansicht wählbar sein soll (User-Wunsch)
+    # When die UI geprüft Then trägt die Assistent-View ein Antwortmodell-
+    # Dropdown, das den gewählten Wert in die globalen Einstellungen
+    # (generation_model bzw. gibb_model je Provider) zurückspielt.
+    html = _read("index.html")
+    js = _read("app.js")
+    assert 'id="ask-model"' in html, "Antwortmodell-Dropdown fehlt in der Assistent-View"
+    assert "refreshAskModelSelect" in js
+    assert "gibb_model" in js and "generation_model" in js
+
+
 def test_req814_help_covers_all_work_views() -> None:
     # Given die Bereichshilfe When geprüft Then jeder Arbeitsbereich (ohne
     # die Onboarding-View, die selbst die Hilfe ist) hat einen Eintrag mit
