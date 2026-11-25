@@ -47,8 +47,17 @@ def test_req800_static_assets_served(app_server: TestClient) -> None:
         assert app_server.get(path).status_code == 200
 
 
-def test_req800_status_returns_app_state(app_server: TestClient) -> None:
+def test_req800_status_returns_app_state(
+    app_server: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     # Given der App-Modus When GET /v1/status (mit Token) Then der App-Zustand
+    # Deterministik: Ollama auf geschlossenen Port, Datenverzeichnis leer (tmp).
+    from sni.app import api as app_api
+
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        monkeypatch.setattr(app_api, "OLLAMA_URL", f"http://127.0.0.1:{probe.getsockname()[1]}")
+    monkeypatch.setenv("SIA_DATA_DIR", str(tmp_path / "data"))
     res = app_server.get("/v1/status", headers={"x-sia-token": TOKEN})
     assert res.status_code == 200
     data = res.json()
@@ -56,7 +65,7 @@ def test_req800_status_returns_app_state(app_server: TestClient) -> None:
     assert data["mode"] == "window"
     assert data["port"] == 8123
     assert data["login"] is None  # M8.2
-    assert data["ollama"] is None  # M8.4
+    assert data["ollama"] == {"reachable": False, "model": "qwen3:4b"}  # M8.4
     assert data["documents"] == 0
     assert data["summary"] == "Bereit. Bitte im Normenkatalog einloggen."
     assert data["disclaimer"] == DISCLAIMER

@@ -5,7 +5,8 @@ Kern-API (``sni.api.main``) bleibt unverändert (Schichten-Regel).
 Alle Antworten tragen den G6-Disclaimer.
 
 Endpunkte (09_CONSUMER_APP.md §6.2): Login/Logout, Katalog, Download
-(async Job), lokale Dokumente (Liste, PDF, Entfernen), Jobs, Status.
+(async Job), lokale Dokumente (Liste, PDF, Entfernen), Ollama-Modelle
+(Liste, Pull, Delete), RAG-Fragen (SSE), Jobs, Status.
 """
 
 from __future__ import annotations
@@ -34,6 +35,7 @@ from sni.documents.analysis import OLLAMA_URL
 from sni.documents.downloads import Job
 from sni.documents.pdfcache import CacheIntegrityError
 from sni.documents.registry import LocalDocumentState
+from sni.models.ollama_manager import OllamaModelManager
 from sni.rag.grounded import GroundedQa
 from sni.rag.model_provider import ModelProvider
 from sni.rag.providers.gibb import OpenAiCompatibleProvider
@@ -360,6 +362,19 @@ def _ask_events(
 # ------------------------------------------------------------------ Endpunkte
 
 
+def _ollama_status(shop: ShopState) -> dict[str, object]:
+    """REQ-806: Ollama-Status für ``sni:status`` (Erreichbarkeit + aktives Modell)."""
+    try:
+        reachable = OllamaModelManager(OLLAMA_URL).available()
+    except PermissionError:
+        reachable = False  # Host-Check im Konstruktor (konfigurierter Remote-Host)
+    state = load_workspace_json(shop.data_dir) or {}
+    model: str | None = None
+    if str(state.get("provider") or DEFAULT_PROVIDER) == "ollama":
+        model = str(state.get("generation_model") or DEFAULT_GENERATION_MODEL) or None
+    return {"reachable": reachable, "model": model}
+
+
 @router.get("/status", response_model=StatusResponse)
 def status(request: Request) -> StatusResponse:
     """REQ-800: App-Zustand für die Statuszeile in allen 6 Views."""
@@ -380,6 +395,7 @@ def status(request: Request) -> StatusResponse:
         mode=request.app.state.app_mode,
         port=request.app.state.app_port,
         login=login,
+        ollama=_ollama_status(shop),
         documents=documents,
         summary=_status_summary(shop),
         disclaimer=DISCLAIMER,
@@ -559,8 +575,54 @@ def document_remove(document_id: str, request: Request) -> JSONResponse:
 
 @router.get("/jobs")
 def jobs(request: Request) -> list[dict[str, object]]:
-    """09 §6.2: Job-Queue (``[sni:job]``); UI pollt alle 2 s; ohne Login: leer."""
-    bundle = _shop(request).bundle
-    if bundle is None:
-        return []
-    return [_job(job) for job in bundle.downloads.jobs()]
+    """09 §6.2: Job-Queue (``[sni:job]``); UI pollt alle 2 s.
+
+    Bundle-Jobs (Download/Analyse, nur eingeloggt) + Modell-Pull-Jobs
+    (Login-unabhängig, REQ-806).
+    """
+    shop = _shop(request)
+    bundle_jobs = shop.bundle.downloads.jobs() if shop.bundle is not None else []
+    return [_job(job) for job in [*bundle_jobs, *shop.pull_jobs()]]
+
+
+@router.get("/models/ollama")
+def models_ollama() -> dict[str, object]:
+    """09 §6.2: Ollama-Modellliste (``GET /api/tags`` weiterreichen, REQ-806)."""
+    try:
+        models = OllamaModelManager(OLLAMA_URL).list_installed()
+    except Exception:  # noqa: BLE001 — Ollama abwesend/fehlerhaft → available=false
+        return {"available": False, "models": []}
+    return {
+        "available": True,
+        "models": [
+            {"name": m.name, "size_bytes": m.size_bytes, "modified_at": m.modified_at}
+            for m in models
+        ],
+    }
+
+
+@router.post("/models/ollama/{name}/pull")
+def models_ollama_pull(name: str, request: Request) -> JSONResponse:
+    """09 §6.2: Modell-Download als async Job (2-h-Timeout wie Java, REQ-806)."""
+    try:
+        OllamaModelManager._require_model(name)
+    except ValueError as exc:
+        return _error(400, str(exc))
+    shop = _shop(request)
+    job = shop.submit_pull(name, OllamaModelManager(OLLAMA_URL))
+    return JSONResponse(
+        {"status": "accepted", "job": _job(job), "disclaimer": DISCLAIMER},
+        status_code=202,
+    )
+
+
+@router.delete("/models/ollama/{name}")
+def models_ollama_delete(name: str) -> JSONResponse:
+    """09 §6.2: lokales Modell löschen (REQ-806)."""
+    try:
+        OllamaModelManager(OLLAMA_URL).delete(name)
+    except (ValueError, PermissionError) as exc:
+        return _error(400, str(exc))
+    except Exception as exc:  # noqa: BLE001 — Ollama-Fehler → 502
+        return _error(502, f"Modell konnte nicht gelöscht werden: {exc}")
+    return JSONResponse({"ok": True, "disclaimer": DISCLAIMER})

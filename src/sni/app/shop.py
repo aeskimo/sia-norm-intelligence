@@ -13,14 +13,18 @@ Der SOAP-Client ist pro Provider konstruiert (``SiaSoapClient.for_provider``);
 from __future__ import annotations
 
 import contextlib
+import threading
+import uuid
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
-from sni.documents.analysis import DocumentAnalysisPipeline
-from sni.documents.downloads import DownloadService
+from sni.documents.analysis import OLLAMA_URL, DocumentAnalysisPipeline
+from sni.documents.downloads import DownloadService, Job, JobKind, JobStatus
 from sni.documents.pdfcache import SessionDocumentCache
 from sni.documents.registry import LocalDocumentRegistry
+from sni.models.ollama_manager import OllamaModelManager
 from sni.secrets.keyring_store import SialLoginStore
 from sni.shop.catalog import CatalogStore
 from sni.shop.providers import PHGR, SIA, SWKI, VSS, ProviderProfile
@@ -88,6 +92,11 @@ class ShopState:
         self._data_dir = data_dir
         self._state_keys = state_keys if state_keys is not None else default_state_keys()
         self._bundle: ShopBundle | None = None
+        # REQ-806: Modell-Pull-Jobs (eigene Queue, Login-unabhängig — Java
+        # verwaltete Modelle in separater App/Queue; max. 1 paralleler Pull).
+        self._pull_jobs: dict[str, Job] = {}
+        self._pull_lock = threading.RLock()
+        self._pull_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="sni-model-pull")
 
     # ------------------------------------------------------------------ Zugriff
 
@@ -109,6 +118,63 @@ class ShopState:
     def data_dir(self) -> Path | None:
         """User-Datenverzeichnis (``SIA_DATA_DIR``/Injektion); ``None`` = Default."""
         return self._data_dir
+
+    # ------------------------------------------------------------------ Modell-Pull (REQ-806)
+
+    def submit_pull(
+        self,
+        model: str,
+        manager: OllamaModelManager | None = None,
+    ) -> Job:
+        """Reicht einen Modell-Download-Job ein (2-h-Timeout wie Java).
+
+        Login-unabhängig (lokale Modelle); max. 1 paralleler Pull-Job.
+        NDJSON-Statuszeilen → ``Job.progress`` (UI pollt ``/v1/jobs``).
+        """
+        job = Job(id=uuid.uuid4().hex, kind=JobKind.PULL, document_id=None)
+        with self._pull_lock:
+            self._pull_jobs[job.id] = job
+        self._pull_executor.submit(self._run_pull, job.id, model, manager)
+        return job
+
+    def pull_jobs(self) -> list[Job]:
+        """Pull-Jobs in Einreichungs-Reihenfolge (``/v1/jobs``-Quelle)."""
+        with self._pull_lock:
+            return list(self._pull_jobs.values())
+
+    def _run_pull(
+        self,
+        job_id: str,
+        model: str,
+        manager: OllamaModelManager | None,
+    ) -> None:
+        self._update_pull(job_id, status=JobStatus.RUNNING, progress="Modell wird geladen …")
+        try:
+            mgr = manager if manager is not None else OllamaModelManager(OLLAMA_URL)
+            mgr.pull(model, progress=lambda status: self._update_pull(job_id, progress=status))
+            self._update_pull(job_id, status=JobStatus.DONE, progress="Modell lokal installiert")
+        except Exception as exc:  # noqa: BLE001 — Job-Endzustand, nie Crash
+            self._update_pull(job_id, status=JobStatus.ERROR, error=f"{type(exc).__name__}: {exc}")
+
+    def _update_pull(
+        self,
+        job_id: str,
+        status: JobStatus | None = None,
+        progress: str | None = None,
+        error: str | None = None,
+    ) -> None:
+        with self._pull_lock:
+            job = self._pull_jobs.get(job_id)
+            if job is None:
+                return
+            self._pull_jobs[job_id] = Job(
+                id=job.id,
+                kind=job.kind,
+                document_id=job.document_id,
+                status=status if status is not None else job.status,
+                progress=progress if progress is not None else job.progress,
+                error=error if error is not None else job.error,
+            )
 
     # ------------------------------------------------------------------ Sitzung
 

@@ -12,7 +12,10 @@
 - Der JSON-Body wird wie in Java per Hand escaped (keine
   Abhängigkeit vom Antwortformat); :func:`string_field` liest das
   Antwortfeld mit vollem Escape-Handling (auch in ``gibb.py``
-  verwendet, Java: ``OllamaProvider.stringField``).
+  verwendet, Java: ``OllamaProvider.stringField``). Die Helper
+  wohnen in :mod:`sni.models.ollama_manager` (Java: ``OllamaJson`` im
+  selben Paket) und werden hier für die bestehenden Imports
+  weitergeleitet.
 """
 
 from __future__ import annotations
@@ -22,76 +25,14 @@ from urllib.parse import urljoin, urlparse
 
 import httpx
 
+from sni.models.ollama_manager import esc as esc  # noqa: PLC0414 — expliziter Re-Export
+from sni.models.ollama_manager import string_field as string_field  # noqa: PLC0414
 from sni.rag.model_provider import ModelProvider
 
 #: Zeitlimits in Sekunden (Java: connect 3 s; /api/tags 3 s; Generierung 10 min).
 CONNECT_TIMEOUT = 3.0
 TAGS_TIMEOUT = 3.0
 GENERATE_TIMEOUT = 600.0
-
-
-def esc(value: str) -> str:
-    """JSON-String-Escapes (Java: ``OllamaProvider.esc``, 1:1)."""
-    return (
-        value.replace("\\", "\\\\")
-        .replace('"', '\\"')
-        .replace("\n", "\\n")
-        .replace("\r", "\\r")
-        .replace("\t", "\\t")
-    )
-
-
-def string_field(json: str, field: str) -> str | None:
-    """Liest ein JSON-String-Feld und dekodiert alle Escape-Sequenzen.
-
-    Java: ``OllamaProvider.stringField`` (1:1); ``None``, wenn das Feld
-    fehlt oder kein String ist. Unvollständige Sequenzen werfen
-    ``ValueError`` (Java: ``IllegalArgumentException``).
-    """
-    k = json.find(f'"{field}"')
-    if k < 0:
-        return None
-    c = json.find(":", k + len(field) + 2)
-    if c < 0:
-        return None
-    i = c + 1
-    while i < len(json) and json[i].isspace():
-        i += 1
-    if i >= len(json) or json[i] != '"':
-        return None
-    out: list[str] = []
-    i += 1
-    while i < len(json):
-        x = json[i]
-        i += 1
-        if x == '"':
-            return "".join(out)
-        if x != "\\":
-            out.append(x)
-            continue
-        if i >= len(json):
-            raise ValueError("JSON-String unvollständig")
-        e = json[i]
-        i += 1
-        if e == "u":
-            if i + 4 > len(json):
-                raise ValueError("JSON-String unvollständig")
-            out.append(chr(int(json[i : i + 4], 16)))
-            i += 4
-        elif e == "n":
-            out.append("\n")
-        elif e == "r":
-            out.append("\r")
-        elif e == "t":
-            out.append("\t")
-        elif e == "b":
-            out.append("\b")
-        elif e == "f":
-            out.append("\f")
-        else:
-            # Java default: '"' / "\\" / "/" / unbekannt → Zeichen wie-is.
-            out.append(e)
-    raise ValueError("JSON-String unvollständig")
 
 
 class OllamaChatProvider(ModelProvider):

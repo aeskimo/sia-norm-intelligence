@@ -466,7 +466,7 @@ class _LoopbackHttpServer(ThreadingHTTPServer):
 
 
 class _LoopbackRequestHandler(BaseHTTPRequestHandler):
-    """Leitet GET/POST an ``handlers[path]`` weiter (Mock-Endpunkte)."""
+    """Leitet GET/POST/DELETE an ``handlers[path]`` weiter (Mock-Endpunkte)."""
 
     def log_message(self, format: str, *args: object) -> None:
         pass  # Test-Ausgabe sauber halten
@@ -475,6 +475,10 @@ class _LoopbackRequestHandler(BaseHTTPRequestHandler):
         self._dispatch(b"")
 
     def do_POST(self) -> None:
+        length = int(self.headers.get("Content-Length") or 0)
+        self._dispatch(self.rfile.read(length))
+
+    def do_DELETE(self) -> None:
         length = int(self.headers.get("Content-Length") or 0)
         self._dispatch(self.rfile.read(length))
 
