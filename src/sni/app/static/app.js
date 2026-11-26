@@ -1074,9 +1074,10 @@
     }
   });
 
-  /* --- Norm Intelligence (M8.5, REQ-811/812) ----------------------------------
+  /* --- Norm Intelligence (M8.5 REQ-811/812, M13.1 REQ-1303) --------------------
       1:1 Java IntelligencePanel: Normfrage → deterministische Antwort
       (Aussageklasse-Chip, Claims, Fundstellen, Disclaimer), Semantik-Export,
+      LLM-Vervollständigung (Stufe 3, Vorschlag document.llm.json, G3),
       Review-Queue (Freigeben/Ablehnen, G3) und Projektdaten-Prüfung
       (pass/fail/insufficient_data, BCF/IDS-Export). */
 
@@ -1198,12 +1199,17 @@
     if (!state.loggedIn) {
       return;
     }
-    const select = $("intel-export-norm");
+    let ready;
     try {
       const docs = await apiJson("/v1/documents");
-      const ready = docs.filter(function (d) {
+      ready = docs.filter(function (d) {
         return d.status === "FULLTEXT_READY" || d.status === "HYBRID_READY";
       });
+    } catch (err) {
+      return; /* Auswahl behalten */
+    }
+    ["intel-export-norm", "intel-llm-norm"].forEach(function (selectId) {
+      const select = $(selectId);
       const current = select.value;
       select.innerHTML =
         '<option value="">(keine indexierte Norm)</option>' +
@@ -1222,9 +1228,7 @@
       ) {
         select.value = current;
       }
-    } catch (err) {
-      /* Auswahl behalten */
-    }
+    });
   }
 
   $("intel-export").addEventListener("click", async function () {
@@ -1263,6 +1267,45 @@
     } finally {
       $("intel-export").disabled = false;
       $("intel-export").textContent = "document.json erzeugen + Ingest";
+    }
+  });
+
+  /* --- 2b) LLM-Vervollständigung (M13.1, REQ-1303) ----------------------------
+      Stufe 3 (ADR-0010): Vorschlag document.llm.json; document.json und
+      Review Queue bleiben unberührt (G3), Antwort ohne Normtexte (G4). */
+
+  $("intel-llm-run").addEventListener("click", async function () {
+    const productId = $("intel-llm-norm").value;
+    if (!productId) {
+      intelStatus("error", "Norm auswählen (indexierte Normen).");
+      return;
+    }
+    $("intel-llm-run").disabled = true;
+    $("intel-llm-run").textContent = "LLM läuft …";
+    try {
+      const data = await apiJson("/v1/ingest/llm-complete", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ norm_id: productId })
+      });
+      const lines = [
+        "[LLM] Norm: " + (data.norm_id || "") +
+          " — vorgeschlagen: " + (data.clauses_suggested || 0) +
+          ", übernommen (manuell belegt): " + (data.clauses_kept || 0),
+        "- Vorschlag: " + (data.proposal || "document.llm.json"),
+        "- Uebernahme als document.json bleibt ein menschlicher Akt (G3), dann: make ingest"
+      ];
+      showIntelReport("intel-llm-report", lines.join("\n"));
+      intelStatus(
+        "success",
+        "Vorschlag " + (data.proposal || "document.llm.json") +
+          " geschrieben — document.json und Review Queue unberührt (G3)."
+      );
+    } catch (err) {
+      intelStatus("error", "LLM-Vervollständigung fehlgeschlagen: " + err.message);
+    } finally {
+      $("intel-llm-run").disabled = false;
+      $("intel-llm-run").textContent = "Vorschlag erzeugen";
     }
   });
 

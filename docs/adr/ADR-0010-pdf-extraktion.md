@@ -71,6 +71,10 @@
      vor; Output = Vorschlag `document.llm.json`, validiert gegen
      den document.json-Vertrag (Ingest gegen temporäre Queue);
      `document.json` und die Review Queue bleiben unberührt (G3).
+     Seit M13.1 (2026-11-26) auch in der Consumer-App:
+     `POST /v1/ingest/llm-complete` (Intelligence-View, 09 §6.2) —
+     dieselbe Kernlogik, Konfiguration aus den App-Einstellungen
+     (gibb-Provider aus workspace.json + Keyring) statt Env.
   5. **Neue Laufzeit-Abhängigkeit (AGENTS.md §5):** `pypdf`
      (MIT, reine Python, keine nativen Dependencies) als PDF-
      Lesebibliothek für Stufe 1. Alternative `pdfplumber` (bessere

@@ -37,6 +37,15 @@ from sni.documents.downloads import Job
 from sni.documents.pdfcache import CacheIntegrityError
 from sni.documents.registry import LocalDocumentState
 from sni.export.semantic import export as semantic_export
+from sni.export.semantic import norm_id_for
+from sni.ingest.llm_complete import (
+    ENV_API_KEY,
+    ENV_ENDPOINT,
+    ENV_MODEL,
+    PROPOSAL_FILENAME,
+    LlmCompleteError,
+    run_llm_complete,
+)
 from sni.ingest.pipeline import (
     IngestError,
     default_norms_dir,
@@ -135,6 +144,13 @@ class WorksetUpdateRequest(BaseModel):
 
 class SemanticExportRequest(BaseModel):
     """Semantik-Export (09 §6.2): ``norm_id`` = product_id des lokalen Dokuments."""
+
+    norm_id: str
+
+
+class LlmCompleteRequest(BaseModel):
+    """LLM-Vervollständigung (09 §6.2, M13.1): ``norm_id`` = product_id des
+    lokalen Dokuments (Mount wird wie beim Semantik-Export abgeleitet)."""
 
     norm_id: str
 
@@ -958,6 +974,74 @@ def semantic_export_endpoint(payload: SemanticExportRequest, request: Request) -
             "candidates": [str(candidate["id"]) for candidate in ingested.candidates],
             "skipped": list(result.skipped_reasons),
             "gaps": [str(gap["id"]) for gap in ingested.gap_reports],
+            "disclaimer": DISCLAIMER,
+        }
+    )
+
+
+# ------------------------------------------------------------------ LLM-Vervollständigung (M13.1)
+
+
+@router.post("/ingest/llm-complete")
+def llm_complete_endpoint(payload: LlmCompleteRequest, request: Request) -> JSONResponse:
+    """09 §6.2: Stufe 3 (M13, ADR-0010): LLM-gestützte Vervollständigung → Vorschlag.
+
+    1:1 ``make llm NORM=<norm-id>``, Konfiguration aus den App-Einstellungen
+    statt ``SNI_LLM_*``-Env: Provider ``gibb`` aus ``workspace.json``
+    (Basis-URL, Modell) + API-Key aus ``GIBB_API_KEY``/Keyring
+    (``gibb-api-key``) — derselbe freigegebene Endpunkt wie beim
+    Assistenten (ADR-0003, REQ-1301). ``norm_id`` ist das product_id des
+    lokalen Dokuments; der Mount wird wie beim Semantik-Export abgeleitet
+    (``norm_id_for``). Ergebnis = Vorschlag ``document.llm.json``;
+    ``document.json`` und die Review Queue bleiben unberührt (G3). Die
+    Antwort enthält nur Norm-ID, Zählungen und den Vorschlagsnamen — keine
+    Normtexte (G4).
+    """
+    bundle = _require_bundle(request)
+    if isinstance(bundle, JSONResponse):
+        return bundle
+    state = bundle.registry.get(payload.norm_id)
+    document = state.document if state is not None else None
+    if document is None:
+        return _error(404, f"Unbekanntes lokales Dokument: {payload.norm_id}")
+    try:
+        mount_id = norm_id_for(document.number, document.year)
+    except ValueError as exc:
+        return _error(400, str(exc))
+    shop = _shop(request)
+    settings = load_settings(shop.data_dir)
+    if str(settings.get("provider") or DEFAULT_PROVIDER) != "gibb":
+        return _error(
+            400,
+            "Vervollständigung erfordert den freigegebenen gibb-Endpunkt: "
+            "Provider 'gibb' in den Einstellungen setzen (ADR-0003).",
+        )
+    model = str(settings.get("gibb_model") or "").strip()
+    if not model:
+        return _error(400, "gibb-Modell ist nicht konfiguriert (Einstellungen).")
+    api_key = os.environ.get("GIBB_API_KEY", "").strip()
+    if not api_key:
+        api_key = GibbApiKeyStore().load() or ""
+    if not api_key:
+        return _error(
+            400, "gibb-API-Key fehlt (Umgebungsvariable GIBB_API_KEY oder Einstellungen)."
+        )
+    env = {
+        ENV_ENDPOINT: str(settings.get("gibb_base_url") or DEFAULT_GIBB_BASE_URL),
+        ENV_MODEL: model,
+        ENV_API_KEY: api_key,
+    }
+    store: ConceptStore = request.app.state.store
+    try:
+        result = run_llm_complete(mount_id, default_norms_dir(), store.db_path, env)
+    except LlmCompleteError as exc:
+        return _error(400, "; ".join(exc.report))
+    return JSONResponse(
+        {
+            "norm_id": result.norm_id,
+            "clauses_suggested": result.clauses_suggested,
+            "clauses_kept": result.clauses_kept,
+            "proposal": PROPOSAL_FILENAME,
             "disclaimer": DISCLAIMER,
         }
     )

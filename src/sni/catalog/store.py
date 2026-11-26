@@ -45,6 +45,11 @@ class ConceptStore:
             self._conn.execute(_CREATE_TABLE)
             self._conn.commit()
 
+    @property
+    def db_path(self) -> Path:
+        """Pfad der SQLite-Datei (für Tools, die den Katalog direkt öffnen)."""
+        return self._db_path
+
     def close(self) -> None:
         with self._lock:
             self._conn.close()

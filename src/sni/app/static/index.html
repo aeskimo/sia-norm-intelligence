@@ -175,6 +175,17 @@
               <pre id="intel-export-report" class="intel-report" hidden></pre>
             </div>
             <div class="card">
+              <h2 class="card-title">LLM-Vervollständigung (Stufe 3, Vorschlag)</h2>
+              <div class="form-actions">
+                <select id="intel-llm-norm" aria-label="Norm für die LLM-Vervollständigung">
+                  <option value="">(keine indexierte Norm)</option>
+                </select>
+                <button type="button" class="btn btn-accent" id="intel-llm-run">Vorschlag erzeugen</button>
+              </div>
+              <pre id="intel-llm-report" class="intel-report" hidden></pre>
+              <p class="muted">Voraussetzung: Entwurf im Mount (make extract) mit manuell belegter Norm/Edition (Stufe 2) und gibb-Endpunkt in den Einstellungen (ADR-0003). Ergebnis: document.llm.json als Vorschlag — document.json und Review Queue bleiben unberührt (G3).</p>
+            </div>
+            <div class="card">
               <h2 class="card-title">Review-Queue (Kandidaten freigeben, G3)</h2>
               <div class="form-actions">
                 <button type="button" class="btn" id="intel-queue-reload">Queue neu laden</button>

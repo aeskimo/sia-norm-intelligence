@@ -226,6 +226,7 @@ Sicherheit: §10.2 (zufälliger Port, Session-Token, Host/Origin-Check).
 | `GET` | `/v1/models/gibb` | gibb-Modellliste (OpenAI `models`, Bearer aus Keyring; 1:1 Java-«Modelle auflisten»: nur Key + Basis-URL nötig, Modell-Platzhalter `temp`) → `{available, models[]}` |
 | `GET/PUT` | `/v1/settings` | `sni:settings` (Modelle, Provider, gibb-URL/Modell, Freigabename); gibb-Key nie als Antwort (nur `gibb_key_set: true`) |
 | `POST` | `/v1/ingest/semantic-export` | `{norm_id}` (product_id des lokalen Dokuments) → deterministischer Export → `document.json` → Ingest in-process → `{norm_id, candidates[], skipped[], gaps[]}` |
+| `POST` | `/v1/ingest/llm-complete` | `{norm_id}` (product_id des lokalen Dokuments) → Stufe 3 (M13, ADR-0010): gibb-Endpunkt aus den App-Einstellungen (workspace.json + Keyring `gibb-api-key`; Provider muss `gibb` sein, ADR-0003) → `document.draft.json` im Mount (Mount-ID wie beim Semantik-Export) → Vorschlag `document.llm.json` → `{norm_id, clauses_suggested, clauses_kept, proposal}`; `document.json` und Review Queue bleiben unberührt (G3), Antwort ohne Normtexte (G4) |
 | `GET` | `/v1/review/queue` | Kandidaten (`norm_statement`, `review_status=candidate`) + GAPs |
 | `POST` | `/v1/review/{id}/approve` | `{approved_by?}` → `approved` + `approved_at` + `source.verified=true`, Move nach `extracted/` (G3, ADR-0008) |
 | `POST` | `/v1/review/{id}/reject` | Kandidat verwerfen (G3) |
