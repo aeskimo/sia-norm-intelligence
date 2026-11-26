@@ -35,12 +35,15 @@ Guardrails:
   Zusammenfassungstexte.
 - KBOB: alle Fehler werden gesammelt (auch Modellanfrage-Fehler: HTTP-
   Status, Netzwerk); bei Fehlern wird nichts geschrieben.
+- Transiente Provider-/Netzwerkfehler (beobachtet: HTTP 422, SSL-
+  Handshake-Timeout) werden einmal mit kurzer Pause wiederholt.
 """
 
 from __future__ import annotations
 
 import json
 import tempfile
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -68,6 +71,10 @@ DRAFT_FILENAME = "document.draft.json"
 ENV_ENDPOINT = "SNI_LLM_ENDPOINT"
 ENV_MODEL = "SNI_LLM_MODEL"
 ENV_API_KEY = "SNI_LLM_API_KEY"
+
+#: Wartezeit vor dem (einzigem) Wiederholungsversuch einer fehlgeschlagenen
+#: Modellanfrage (transiente Provider-/Netzwerkfehler, Dry-Run M13.1).
+RETRY_DELAY_SECONDS = 3.0
 
 
 class LlmCompleteError(RuntimeError):
@@ -375,6 +382,22 @@ def _user_prompt(
     )
 
 
+def _generate_with_retry(client: LlmClient, system: str, prompt: str) -> str | None:
+    """Eine Modellanfrage mit einem Wiederholungsversuch bei Transientfehlern.
+
+    Provider-/Netzwerkfehler am freigegebenen Endpunkt sind beobachtbar
+    transient (Dry-Run M13.1: derselbe Prompt schlägt mit HTTP 422 fehl
+    und gelingt im Einzelaufruf; SSL-Handshake-Timeout). Ein einziger
+    Wiederholungsversuch nach kurzer Pause; bleibt der zweite Versuch
+    fehlerhaft, läuft die Exception weiter (KBOB: Fehler gesammelt).
+    """
+    try:
+        return client.generate(system, prompt)
+    except (RuntimeError, httpx.HTTPError):
+        time.sleep(RETRY_DELAY_SECONDS)
+        return client.generate(system, prompt)
+
+
 def _complete_unit(
     label: str,
     clause_raw: dict[str, object],
@@ -405,7 +428,8 @@ def _complete_unit(
         )
         return None
     try:
-        response = client.generate(
+        response = _generate_with_retry(
+            client,
             _SYSTEM_PROMPT,
             _user_prompt(number, text, allowed_types, allowed_obligations, catalog_lines),
         )

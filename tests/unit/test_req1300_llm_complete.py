@@ -25,6 +25,7 @@ import pytest
 
 from sni.catalog.snapshot import load_snapshot
 from sni.catalog.store import ConceptStore
+from sni.ingest import llm_complete
 from sni.ingest.cli import main
 from sni.ingest.llm_complete import (
     ENV_API_KEY,
@@ -381,12 +382,15 @@ def test_req1300_no_content_response_rejected(tmp_path: Path, catalog_db: Path) 
     assert any("keinen Inhalt" in line for line in exc.value.report)
 
 
-def test_req1300_provider_http_error_rejected(tmp_path: Path, catalog_db: Path) -> None:
+def test_req1300_provider_http_error_rejected(
+    tmp_path: Path, catalog_db: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Provider-Fehler (gibb.py RuntimeError, z. B. HTTP 422) → KBOB-Fehler.
 
     Die Meldung des Providers ist G4-sicher (HTTP-Status, kein Normtext);
     der Bericht darf trotzdem keinen Ziffern-Text enthalten.
     """
+    monkeypatch.setattr(llm_complete, "RETRY_DELAY_SECONDS", 0.0)
 
     def boom(_s: str, _p: str) -> str:
         raise RuntimeError("Modellanfrage fehlgeschlagen (HTTP 422)")
@@ -406,8 +410,11 @@ def test_req1300_provider_http_error_rejected(tmp_path: Path, catalog_db: Path) 
     assert not (tmp_path / "norms" / NORM_ID / PROPOSAL_FILENAME).exists()
 
 
-def test_req1300_provider_network_error_rejected(tmp_path: Path, catalog_db: Path) -> None:
+def test_req1300_provider_network_error_rejected(
+    tmp_path: Path, catalog_db: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Netzwerkfehler (httpx) → KBOB-Fehler, nichts wird geschrieben."""
+    monkeypatch.setattr(llm_complete, "RETRY_DELAY_SECONDS", 0.0)
 
     def boom(_s: str, _p: str) -> str:
         raise httpx.ConnectError("connection refused")
@@ -424,13 +431,16 @@ def test_req1300_provider_network_error_rejected(tmp_path: Path, catalog_db: Pat
     assert not (tmp_path / "norms" / NORM_ID / PROPOSAL_FILENAME).exists()
 
 
-def test_req1300_provider_error_aborts_whole_draft(tmp_path: Path, catalog_db: Path) -> None:
-    """Ein Provider-Fehler → der gesamte Vorschlag wird verworfen (KBOB)."""
+def test_req1300_provider_error_aborts_whole_draft(
+    tmp_path: Path, catalog_db: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ein Provider-Fehler (auch nach Retry) → Vorschlag wird verworfen (KBOB)."""
+    monkeypatch.setattr(llm_complete, "RETRY_DELAY_SECONDS", 0.0)
     calls = {"n": 0}
 
-    def responder(_s: str, _p: str) -> str:
+    def responder(_s: str, p: str) -> str:
         calls["n"] += 1
-        if calls["n"] == 1:
+        if "Ziffernnummer: 1" in p:  # Ziffer 1: beide Versuche fehlerhaft
             raise RuntimeError("Modellanfrage fehlgeschlagen (HTTP 503)")
         return valid_response()
 
@@ -443,8 +453,32 @@ def test_req1300_provider_error_aborts_whole_draft(tmp_path: Path, catalog_db: P
             make_draft([make_clause("1", "Erste Ziffer."), make_clause("2", "Zweite Ziffer.")]),
         )
     assert any("Ziffer 1" in line and "HTTP 503" in line for line in exc.value.report)
-    assert calls["n"] == 2  # alle Ziffern werden abgearbeitet (Fehler gesammelt)
+    assert calls["n"] == 3  # Ziffer 1: 2 Versuche, Ziffer 2: 1 — alle abgearbeitet
     assert not (tmp_path / "norms" / NORM_ID / PROPOSAL_FILENAME).exists()
+
+
+def test_req1300_transient_provider_error_retried_once(
+    tmp_path: Path, catalog_db: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Transienter Provider-Fehler (HTTP 422) → einmaliger Retry → Lauf gelingt."""
+    monkeypatch.setattr(llm_complete, "RETRY_DELAY_SECONDS", 0.0)
+    calls = {"n": 0}
+
+    def responder(_s: str, _p: str) -> str:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("Modellanfrage fehlgeschlagen (HTTP 422)")
+        return valid_response()
+
+    client = FakeLlm(responder)
+    _run(
+        tmp_path / "norms",
+        catalog_db,
+        client,
+        make_draft([make_clause("1", "Erste Ziffer.")]),
+    )
+    assert calls["n"] == 2  # erst Retry, dann Erfolg
+    assert (tmp_path / "norms" / NORM_ID / PROPOSAL_FILENAME).is_file()
 
 
 def test_req1300_kbob_collects_all_errors(tmp_path: Path, catalog_db: Path) -> None:

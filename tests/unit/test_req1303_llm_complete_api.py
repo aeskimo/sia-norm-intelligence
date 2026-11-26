@@ -339,6 +339,7 @@ def test_req1303_api_g4_no_normtext_in_error(
 
 def test_req1303_api_provider_error_is_400(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Provider-Fehler (z. B. HTTP 422) → 400 mit KBOB-Bericht, nicht 500."""
+    monkeypatch.setattr(llm_complete, "RETRY_DELAY_SECONDS", 0.0)
     client, app = _build(tmp_path, monkeypatch)
     _import_concepts(app)
     _login(client)
