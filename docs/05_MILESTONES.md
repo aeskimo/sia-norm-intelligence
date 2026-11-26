@@ -90,7 +90,9 @@ Voraussetzung (extern): SIA-Neuexport der 8 textlosen PDFs mit Textschicht (User
 - REQ-1202: Akzeptanz: ≥ 8 von 9 Pilot-Normen liefern ein Ziffern-Skelett, das der Textschicht-Extraktion qualitativ entspricht; Fehlerbericht G4-konform (nur Zählungen/Feldnamen)
 
 ## M13 – Stufe 3: LLM-gestützte Vervollständigung (ADR-0010 Stufe 3, eigener Meilenstein gemäss ADR)
-Voraussetzung (extern): ADR-0003-Freigabe (SIA: Endpoint ohne Trainingsnutzung, Konfiguration `SNI_LLM_ENDPOINT`).
+Voraussetzung (extern): ADR-0003-Freigabe (SIA: Endpoint ohne Trainingsnutzung, Konfiguration `SNI_LLM_ENDPOINT`) — erfüllt (akzeptiert 2026-11-26, freigegebener Endpunkt: gibb).
 - REQ-1300: LLM-Tool schlägt die Stufe-2-Fachfelder (Aussageklasse, Obligation, Zusammenfassung, Konzepte) aus dem Ziffern-Text des Entwurfs vor; Akzeptanz: nichts landet ohne menschliche Freigabe in der `document.json` (G1/G3)
 - REQ-1301: ausschliesslich freigegebene Modelle/Endpunkte (ADR-0003); Normtext verlässt die lokale Umgebung nur Richtung des konfigurierten Endpoints
 - REQ-1302: ADR-0003 auf «akzeptiert» führen, Stufe 3 in ADR-0010 umsetzen und dokumentieren
+
+Implementierung (M13, 2026-11-26): `make llm NORM=<norm-id>` (`python -m sni.ingest llm <norm-id>`, `src/sni/ingest/llm_complete.py`). Konfiguration: `SNI_LLM_ENDPOINT` (Basis-URL, z. B. `https://chat.gibb.ch/api`), `SNI_LLM_MODEL` (Modell-ID), `SNI_LLM_API_KEY` (Bearer-Schlüssel; Fallback: Keyring-Account `gibb-api-key`); HTTPS-Zwang (HTTP nur Loopback). Input: `document.draft.json` (Stufe 1) — `norm`/`edition` müssen bereits manuell (Stufe 2) belegt sein; pro Ziffer geht ausschliesslich der Ziffern-Text plus Concept-Katalog an den Endpunkt. Manuell vollstaendig belegte Ziffern werden uebernommen (keine Ueberschreibung); Ziffern ohne Text, teilweise belegte Fachfelder und nicht im Katalog existierende Concept-IDs sind Fehler (KBOB: nichts wird geschrieben). Output: `document.llm.json` (Vorschlag, gegen den document.json-Vertrag validiert per Ingest gegen temporäre Queue); Uebernahme als `document.json` und `make ingest` bleiben menschliche Akte (G3).

@@ -4,8 +4,10 @@
 - Kontext: OQ-003 wurde mit User-Input beantwortet (2026-11-23): echte
   SIA-Normen liegen als **PDF (Print-Ausgabe)** vor und sind **nur über
   ein Online-Portal (Login)** verfügbar; ein Pilot-Dokument steht
-  bereit. Die LLM-Freigabe nach ADR-0003 ist noch "vorgeschlagen" –
-  bis dahin darf kein Normtext ein LLM-Modell verlassen. Die M2-
+  bereit. Zur Zeit dieser Entscheidung war die LLM-Freigabe nach
+  ADR-0003 noch "vorgeschlagen"; sie wurde am 2026-11-26 akzeptiert
+  (Normtext nur Richtung des freigegebenen Endpunkts, siehe
+  ADR-0003). Die M2-
   Pipeline (`src/sni/ingest/pipeline.py`) erwartet ein strukturiertes
   `data/norms/<norm-id>/document.json` (lokaler Mount, gitignored,
   G4); der Vertrag ist stabil und wird durch diese ADR nicht
@@ -63,8 +65,12 @@
      wird gegen den document.json-Vertrag validiert und bleibt
      Vorschlag (G3: Freigabe bleibt menschlicher Akt), keine
      Zugabe von Inhalten ausserhalb des vorgelegten Textes (G1).
-     Diese Stufe ist in v1 nicht implementiert (YAGNI +
-     ADR-0003-Status "vorgeschlagen").
+     Implementiert in M13 (2026-11-26): `make llm NORM=<norm-id>` —
+     pro Ziffer schlägt das Modell Aussageklasse, Obligation,
+     Summary und Concepts (nur Katalog-IDs) aus dem Ziffern-Text
+     vor; Output = Vorschlag `document.llm.json`, validiert gegen
+     den document.json-Vertrag (Ingest gegen temporäre Queue);
+     `document.json` und die Review Queue bleiben unberührt (G3).
   5. **Neue Laufzeit-Abhängigkeit (AGENTS.md §5):** `pypdf`
      (MIT, reine Python, keine nativen Dependencies) als PDF-
      Lesebibliothek für Stufe 1. Alternative `pdfplumber` (bessere

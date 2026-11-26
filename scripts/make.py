@@ -1,5 +1,6 @@
 """Plattformuebergreifendes Make-Aequivalent: setup | check | eval | run | ingest |
-extract | snapshot | package (REQ-000/REQ-200/REQ-900; package: M8.6, REQ-813).
+extract | llm | snapshot | package (REQ-000/REQ-200/REQ-900; llm: M13;
+package: M8.6, REQ-813).
 
 Wird aufgerufen von:
 - Makefile (Linux/macOS/CI)
@@ -22,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 VENV_DIR = ROOT / ".venv"
 MIN_VERSION = (3, 12)
 PREFERRED_VERSIONS = ("3.12", "3.13", "3.14")
-TARGETS = ("setup", "check", "eval", "run", "ingest", "extract", "snapshot", "package")
+TARGETS = ("setup", "check", "eval", "run", "ingest", "extract", "llm", "snapshot", "package")
 PROBE_VERSION = "import sys; raise SystemExit(0 if sys.version_info >= {min_version} else 1)"
 PROBE_EXECUTABLE = "import sys; print(sys.executable)"
 
@@ -122,6 +123,16 @@ def cmd_extract(norm_id: str | None) -> int:
         print("make: extract braucht eine Norm-ID: make extract NORM=<norm-id>")
         return 2
     _run([py, "-m", "sni.ingest", "extract", norm_id])
+    return 0
+
+
+def cmd_llm(norm_id: str | None) -> int:
+    """M13 (Stufe 3): LLM-gestuetzte Vervollstaendigung (SNI_LLM_* setzen)."""
+    py = str(ensure_venv())
+    if not norm_id:
+        print("make: llm braucht eine Norm-ID: make llm NORM=<norm-id>")
+        return 2
+    _run([py, "-m", "sni.ingest", "llm", norm_id])
     return 0
 
 
@@ -233,12 +244,12 @@ def _parse_file_arg(arg: str) -> str | None:
 def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
     if not args or args[0] not in TARGETS:
-        print(f"Verwendung: make <{' | '.join(TARGETS)}> [ingest/extract: NORM=<norm-id>]")
+        print(f"Verwendung: make <{' | '.join(TARGETS)}> [ingest/extract/llm: NORM=<norm-id>]")
         return 2
     target = args[0]
     norm_id: str | None = None
     file_arg: str | None = None
-    if target in ("ingest", "extract"):
+    if target in ("ingest", "extract", "llm"):
         if len(args) > 2:
             print(f"Verwendung: make {target} NORM=<norm-id>")
             return 2
@@ -258,6 +269,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_ingest(norm_id)
         if target == "extract":
             return cmd_extract(norm_id)
+        if target == "llm":
+            return cmd_llm(norm_id)
         if target == "snapshot":
             return cmd_snapshot(file_arg)
         return HANDLERS[target]()
