@@ -8,6 +8,8 @@ HTTPS-Zwang (HTTP nur Loopback), Bearer-Authentifizierung,
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from sni.rag.providers.gibb import OpenAiCompatibleProvider
@@ -97,6 +99,25 @@ def test_req805_gibb_generate_without_content() -> None:
         pytest.raises(RuntimeError, match="Modellantwort enthielt keinen Inhalt"),
     ):
         _provider(server.url).generate("s", "p")
+
+
+def test_req805_gibb_generate_c0_chars_yield_valid_json_body() -> None:
+    """C0-Steuerzeichen im Prompt (z. B. U+0003 aus PDF-Font-Artefakten)
+    dürfen nie roh im Request-Body stehen — der gibb-Endpunkt verwarf
+    solche Bodies deterministisch mit HTTP 422 (Dry-Run M13.1)."""
+    prompt = 'Ziffer mit Steuerzeichen \x03 und \x15 und Quote " '
+    seen: list[bytes] = []
+
+    def handler(body: bytes) -> tuple[int, str]:
+        seen.append(body)
+        return 200, '{"choices":[{"message":{"content":"ok"}}]}'
+
+    with loopback_server({"/chat/completions": handler}) as server:
+        assert _provider(server.url).generate("s", prompt) == "ok"
+
+    assert len(seen) == 1
+    parsed = json.loads(seen[0])  # gültiges JSON (vor Fix: JSONDecodeError)
+    assert parsed["messages"][1]["content"] == prompt
 
 
 def test_req805_gibb_messages_body_shape() -> None:

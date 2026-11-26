@@ -9,6 +9,7 @@ Testdaten (G4).
 
 from __future__ import annotations
 
+import json
 import socket
 
 import pytest
@@ -212,6 +213,15 @@ def test_req806_delete_non200_raises() -> None:
 def test_req806_esc_matches_java() -> None:
     assert esc('a"b\\c') == 'a\\"b\\\\c'
     assert esc("x\ny\rz\tw") == "x\\ny\\rz\\tw"
+
+
+def test_req806_esc_escapes_remaining_c0_chars() -> None:
+    """RFC 8259: C0-Steuerzeichen (z. B. U+0003 aus PDF-Font-Artefakten)
+    dürfen nie roh im JSON-Body stehen — sonst HTTP 422 am gibb-Endpunkt
+    (Dry-Run M13.1)."""
+    out = esc("a\x03b\x08c\x15d")
+    assert "\x03" not in out and "\x08" not in out and "\x15" not in out
+    assert json.loads(f'"{out}"') == "a\x03b\x08c\x15d"
 
 
 def test_req806_string_field_escapes() -> None:

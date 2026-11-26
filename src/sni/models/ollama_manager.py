@@ -50,15 +50,27 @@ class LocalModelInfo:
             raise ValueError("Modellname fehlt")
 
 
+#: C0-Steuerzeichen, die ``esc`` zusätzlich zum Java-Satz escapen muss.
+_C0_RE = re.compile(r"[\x00-\x1f]")
+
+
 def esc(value: str) -> str:
-    """JSON-String-Escapes (Java: ``OllamaProvider.esc``, 1:1)."""
-    return (
+    """JSON-String-Escapes (Java: ``OllamaProvider.esc``, 1:1).
+
+    Zusätzlich zum Java-Satz (Backslash, Quote, LF, CR, TAB) werden alle
+    übrigen C0-Steuerzeichen als ``\\uXXXX`` escaped: RFC 8259 verbietet
+    rohe C0-Zeichen in JSON-Strings. Die Java-Lücke hat beim gibb-Endpunkt
+    HTTP 422 ausgelöst (Dry-Run M13.1: PDF-Text mit Font-Artefakt
+    enthielt U+0003).
+    """
+    escaped = (
         value.replace("\\", "\\\\")
         .replace('"', '\\"')
         .replace("\n", "\\n")
         .replace("\r", "\\r")
         .replace("\t", "\\t")
     )
+    return _C0_RE.sub(lambda m: f"\\u{ord(m.group()):04x}", escaped)
 
 
 def string_field(json: str, field: str) -> str | None:
