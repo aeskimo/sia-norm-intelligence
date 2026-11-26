@@ -337,6 +337,29 @@ def test_req1303_api_g4_no_normtext_in_error(
     assert not _proposal_path(tmp_path).is_file()
 
 
+def test_req1303_api_provider_error_is_400(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Provider-Fehler (z. B. HTTP 422) → 400 mit KBOB-Bericht, nicht 500."""
+    client, app = _build(tmp_path, monkeypatch)
+    _import_concepts(app)
+    _login(client)
+    _download(client, "prod-101")
+    _write_draft(tmp_path, [_clause(text=f"Die Feuerwiderstandsdauer muss {MARKER} erreichen.")])
+    _configure_gibb(client, key="aus-keychain")
+
+    class BoomLlm:
+        """Provider-Double, dessen Modellanfrage fehlschlaegt (gibb.py RuntimeError)."""
+
+        def generate(self, system: str, prompt: str) -> str | None:
+            raise RuntimeError("Modellanfrage fehlgeschlagen (HTTP 422)")
+
+    monkeypatch.setattr(llm_complete, "_provider_from_env", lambda env: BoomLlm())
+    res = _call(client)
+    assert res.status_code == 400
+    assert "HTTP 422" in res.json()["error"]
+    assert MARKER not in res.text  # G4
+    assert not _proposal_path(tmp_path).is_file()  # KBOB
+
+
 def test_req1303_api_key_from_keyring(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Key-Auflösung über den Keyring (wie die Einstellungen-UI, G4)."""
     client, app = _build(tmp_path, monkeypatch)

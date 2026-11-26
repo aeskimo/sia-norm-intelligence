@@ -20,6 +20,7 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 
+import httpx
 import pytest
 
 from sni.catalog.snapshot import load_snapshot
@@ -378,6 +379,72 @@ def test_req1300_no_content_response_rejected(tmp_path: Path, catalog_db: Path) 
             make_draft([make_clause("1", "Erste Ziffer.")]),
         )
     assert any("keinen Inhalt" in line for line in exc.value.report)
+
+
+def test_req1300_provider_http_error_rejected(tmp_path: Path, catalog_db: Path) -> None:
+    """Provider-Fehler (gibb.py RuntimeError, z. B. HTTP 422) → KBOB-Fehler.
+
+    Die Meldung des Providers ist G4-sicher (HTTP-Status, kein Normtext);
+    der Bericht darf trotzdem keinen Ziffern-Text enthalten.
+    """
+
+    def boom(_s: str, _p: str) -> str:
+        raise RuntimeError("Modellanfrage fehlgeschlagen (HTTP 422)")
+
+    client = FakeLlm(boom)
+    with pytest.raises(LlmCompleteError) as exc:
+        _run(
+            tmp_path / "norms",
+            catalog_db,
+            client,
+            make_draft([make_clause("1", "Erste Ziffer. " + MARKER_TEXT)]),
+        )
+    report = exc.value.report
+    assert any("Ziffer 1" in line and "HTTP 422" in line for line in report)
+    for line in report:
+        assert MARKER_TEXT not in line
+    assert not (tmp_path / "norms" / NORM_ID / PROPOSAL_FILENAME).exists()
+
+
+def test_req1300_provider_network_error_rejected(tmp_path: Path, catalog_db: Path) -> None:
+    """Netzwerkfehler (httpx) → KBOB-Fehler, nichts wird geschrieben."""
+
+    def boom(_s: str, _p: str) -> str:
+        raise httpx.ConnectError("connection refused")
+
+    client = FakeLlm(boom)
+    with pytest.raises(LlmCompleteError) as exc:
+        _run(
+            tmp_path / "norms",
+            catalog_db,
+            client,
+            make_draft([make_clause("1", "Erste Ziffer.")]),
+        )
+    assert any("Ziffer 1" in line and "Netzwerkfehler" in line for line in exc.value.report)
+    assert not (tmp_path / "norms" / NORM_ID / PROPOSAL_FILENAME).exists()
+
+
+def test_req1300_provider_error_aborts_whole_draft(tmp_path: Path, catalog_db: Path) -> None:
+    """Ein Provider-Fehler → der gesamte Vorschlag wird verworfen (KBOB)."""
+    calls = {"n": 0}
+
+    def responder(_s: str, _p: str) -> str:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("Modellanfrage fehlgeschlagen (HTTP 503)")
+        return valid_response()
+
+    client = FakeLlm(responder)
+    with pytest.raises(LlmCompleteError) as exc:
+        _run(
+            tmp_path / "norms",
+            catalog_db,
+            client,
+            make_draft([make_clause("1", "Erste Ziffer."), make_clause("2", "Zweite Ziffer.")]),
+        )
+    assert any("Ziffer 1" in line and "HTTP 503" in line for line in exc.value.report)
+    assert calls["n"] == 2  # alle Ziffern werden abgearbeitet (Fehler gesammelt)
+    assert not (tmp_path / "norms" / NORM_ID / PROPOSAL_FILENAME).exists()
 
 
 def test_req1300_kbob_collects_all_errors(tmp_path: Path, catalog_db: Path) -> None:

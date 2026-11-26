@@ -33,8 +33,8 @@ Guardrails:
 - G4: Fehlerbericht und CLI-Ausgabe enthalten nur Norm-ID, Ziffern,
   Feldnamen, Concept-IDs und Zaehlungen — nie Ziffern- oder
   Zusammenfassungstexte.
-- KBOB: alle Fehler werden gesammelt; bei Fehlern wird nichts
-  geschrieben.
+- KBOB: alle Fehler werden gesammelt (auch Modellanfrage-Fehler: HTTP-
+  Status, Netzwerk); bei Fehlern wird nichts geschrieben.
 """
 
 from __future__ import annotations
@@ -45,6 +45,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, cast
+
+import httpx
 
 from sni.catalog.store import ConceptStore
 from sni.core.schemas import load_schema, make_validator
@@ -402,10 +404,18 @@ def _complete_unit(
             "Fachfelder in Stufe 2 manuell belegen"
         )
         return None
-    response = client.generate(
-        _SYSTEM_PROMPT,
-        _user_prompt(number, text, allowed_types, allowed_obligations, catalog_lines),
-    )
+    try:
+        response = client.generate(
+            _SYSTEM_PROMPT,
+            _user_prompt(number, text, allowed_types, allowed_obligations, catalog_lines),
+        )
+    except RuntimeError as exc:
+        # gibb.py: RuntimeError mit G4-sicherer Meldung (HTTP-Status, kein Normtext).
+        errors.append(f"{label}: {exc}")
+        return None
+    except httpx.HTTPError as exc:
+        errors.append(f"{label}: Netzwerkfehler bei der Modellanfrage ({exc})")
+        return None
     if response is None:
         errors.append(f"{label}: Modellantwort enthielt keinen Inhalt")
         return None
