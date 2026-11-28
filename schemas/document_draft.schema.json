@@ -25,6 +25,10 @@
           "obligation": {"type": "string", "description": "In der Maschinen-Erstellung leer; Werte wie in norm_statement.schema.json, in Stufe 2 zu belegen."},
           "summary": {"type": "string", "description": "In der Maschinen-Erstellung leer; in Stufe 2 als eigene Zusammenfassung zu belegen (kein Normzitat)."},
           "concepts": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "In der Maschinen-Erstellung leer; in Stufe 2 mit Concept-IDs zu belegen."},
+          "needs_manual_review": {"type": "boolean", "description": "M13.2: True, wenn der extrahierte Ziffern-Text verdächtige Zeichen enthaelt (C0/C1-Steuerzeichen, nicht-lateinische Skripte) und manuell geprueft werden muss."},
+          "manual_review_needed": {"type": "boolean", "description": "Alias zu needs_manual_review (M13.2)."},
+          "extraction_quality": {"type": "string", "enum": ["ok", "manual_review"], "description": "M13.2: Qualitaetsflag des extrahierten Ziffern-Texts."},
+          "text_quality": {"type": "string", "enum": ["ok", "suspicious"], "description": "M13.2: Qualitaetsflag des extrahierten Ziffern-Texts (Alias)."},
           "tables": {"type": "array", "items": {"$ref": "#/$defs/unit"}, "description": "In v1 nie automatisch belegt (ADR-0006); in Stufe 2 ergaenzbar."},
           "formulas": {"type": "array", "items": {"$ref": "#/$defs/unit"}, "description": "In v1 nie automatisch belegt (ADR-0006); in Stufe 2 ergaenzbar."}
         }

@@ -96,6 +96,14 @@ def _run_extract(norm_id: str, norms_dir: Path) -> int:
     # ASCII-sicher (Windows-Konsole/PIPE kann cp1252 sein): kein Unicode-Pfeil.
     name = result.draft_path.name
     print(f"[extract] {result.norm_id}: {result.clauses} Ziffern, {seiten} -> {name}")
+    if result.suspicious_clauses:
+        # G4: nur Ziffernnummern, nie Normtexte.
+        ziffern = ", ".join(result.suspicious_clauses)
+        print(
+            f"WARNUNG: {len(result.suspicious_clauses)} Ziffer(n) mit verdächtigen "
+            f"Zeichen im extrahierten Text (manuell prüfen): {ziffern}",
+            file=sys.stderr,
+        )
     return 0
 
 

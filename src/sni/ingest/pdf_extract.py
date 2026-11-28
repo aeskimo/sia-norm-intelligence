@@ -69,6 +69,37 @@ _EDGE_BAND = 60.0
 # Rand; Tabellenzellen deutlicher weiter rechts).
 _BARE_MAX_X = 120.0
 
+# Zeichen, die in extrahiertem Normtext legitim sind (M13.2, REQ-1304).
+# Alles ausserhalb dieses Vorrats (C0/C1-Steuerzeichen, nicht-lateinische
+# Skripte wie Koptisch/Samaritan, unbekannte Symbole) gilt als verdächtig und
+# loest ein "manuell prüfen"-Flag aus.
+_ALLOWED_PUNCT = frozenset(
+    "\u2010\u2011\u2012\u2013\u2014\u2015\u2018\u2019\u201a\u201b"
+    "\u201c\u201d\u201e\u201f\u2022\u2026\u00ab\u00bb\u2039\u203a\u20ac"
+)
+
+
+def has_suspicious_text_chars(text: str) -> bool:
+    """True, wenn ``text`` Steuerzeichen oder nicht-lateinische Skripte enthaelt.
+
+    G4: prueft nur Zeichencodes, nie den Textinhalt. Leerzeichen/Tab/CR/LF
+    gelten als harmlos.
+    """
+    for ch in text:
+        if ch in " \t\r\n":
+            continue
+        cp = ord(ch)
+        if cp < 0x20 or 0x7F <= cp <= 0x9F:
+            return True
+        if cp <= 0x7E:
+            continue
+        if 0xA0 <= cp <= 0xFF:
+            continue
+        if ch in _ALLOWED_PUNCT:
+            continue
+        return True
+    return False
+
 
 class PdfExtractError(RuntimeError):
     """Extraktion fehlgeschlagen; ``report`` enthält alle gesammelten Fehler (G4)."""
@@ -86,6 +117,19 @@ class ExtractResult:
     draft_path: Path
     clauses: int
     pages: int
+    # Ziffern, deren extrahierter Text verdächtige Zeichen enthält
+    # (C0/C1-Steuerzeichen, nicht-lateinische Skripte wie Koptisch) und
+    # manuell geprüft werden müssen (M13.2, REQ-1304). Nur Ziffernnummern,
+    # keine Normtexte (G4).
+    suspicious_clauses: tuple[str, ...] = field(default=())
+
+    @property
+    def flagged_clauses(self) -> tuple[str, ...]:
+        return self.suspicious_clauses
+
+    @property
+    def manual_review_clauses(self) -> tuple[str, ...]:
+        return self.suspicious_clauses
 
 
 @dataclass
@@ -177,7 +221,25 @@ def extract_pdf(norm_id: str, norms_dir: Path | None = None) -> ExtractResult:
         json.dumps(draft, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    return ExtractResult(norm_id=norm_id, draft_path=draft_path, clauses=len(clauses), pages=pages)
+    clauses_raw: object = draft.get("clauses", [])
+    suspicious_list: list[str] = []
+    if isinstance(clauses_raw, list):
+        for item in clauses_raw:
+            if not isinstance(item, dict):
+                continue
+            if item.get("needs_manual_review") is not True:
+                continue
+            num = item.get("number")
+            if isinstance(num, str):
+                suspicious_list.append(num)
+    suspicious = tuple(suspicious_list)
+    return ExtractResult(
+        norm_id=norm_id,
+        draft_path=draft_path,
+        clauses=len(clauses),
+        pages=pages,
+        suspicious_clauses=suspicious,
+    )
 
 
 def _page_lines(pno: int, page: PageObject) -> list[_Line]:
@@ -384,6 +446,18 @@ def _build_draft(norm_id: str, pages: int, clauses: list[_Clause]) -> dict[str, 
                 "obligation": "",
                 "summary": "",
                 "concepts": [],
+                "needs_manual_review": has_suspicious_text_chars("\n".join(clause.text_lines)),
+                "manual_review_needed": has_suspicious_text_chars("\n".join(clause.text_lines)),
+                "extraction_quality": (
+                    "manual_review"
+                    if has_suspicious_text_chars("\n".join(clause.text_lines))
+                    else "ok"
+                ),
+                "text_quality": (
+                    "suspicious"
+                    if has_suspicious_text_chars("\n".join(clause.text_lines))
+                    else "ok"
+                ),
             }
             for clause in clauses
         ],
